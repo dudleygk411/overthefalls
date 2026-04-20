@@ -1,0 +1,2979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Over the Falls">
+<title>Over the Falls — Prototype v7</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #1a0e06;
+    background-image:
+      radial-gradient(ellipse at 30% 20%, rgba(80,50,20,0.4) 0%, transparent 70%),
+      radial-gradient(ellipse at 70% 80%, rgba(40,20,10,0.6) 0%, transparent 70%);
+    color: #3a2a1a;
+    font-family: 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+    overflow: hidden;
+    position: fixed;
+    width: 100%; height: 100%;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* Aged paper texture using SVG noise */
+  .paper-texture {
+    background-color: #f0e4c8;
+    background-image:
+      radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(120,80,40,0.12) 100%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.32  0 0 0 0 0.18  0 0 0 0.08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  #game-root {
+    width: 100%; max-width: 420px;
+    height: 100%; max-height: 820px;
+    background: #1a1410;
+    border: 0.5px solid #3a2a1a;
+    overflow: hidden;
+    position: relative;
+    display: flex; flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px #5a3a1a inset;
+  }
+  #hud {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px;
+    background-color: #ead8ae;
+    background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.4) 0%, transparent 50%, rgba(120,80,40,0.15) 100%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.4  0 0 0 0 0.28  0 0 0 0 0.15  0 0 0 0.06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    border-bottom: 2px solid #6a4828;
+    font-size: 11px;
+    font-family: 'Iowan Old Style', Georgia, serif;
+    color: #2a1a0a;
+    gap: 6px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15) inset;
+  }
+  #hud > div { display: flex; align-items: center; }
+  #hud .currency { font-weight: 700; margin-left: 3px; }
+  #nav-bar {
+    display: flex;
+    background-color: #3a2412;
+    background-image: linear-gradient(180deg, #5a3818 0%, #3a2412 100%);
+    border-bottom: 1px solid #1a0e06;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .nav-btn {
+    flex: 1; padding: 9px 2px; border: none;
+    background: none; font-size: 10px; cursor: pointer;
+    color: #d4b890; letter-spacing: 1.5px;
+    font-family: 'Iowan Old Style', Georgia, serif;
+    font-variant: small-caps;
+    border-top: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .nav-btn.active {
+    color: #f4ecd8;
+    border-top-color: #d4a848;
+    background: linear-gradient(180deg, rgba(212,168,72,0.2) 0%, transparent 100%);
+    text-shadow: 0 0 8px rgba(212,168,72,0.5);
+  }
+  #shake-wrap { position: relative; flex: 1; overflow: hidden; }
+  #stage { display: none; width: 100%; height: 100%; background: #d4c5a0; touch-action: none; }
+  .panel-screen {
+    display:none; position: absolute; inset: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    font-family: 'Iowan Old Style', Georgia, serif;
+  }
+  .picker-header {
+    padding: 10px 12px;
+    background-color: #d8c090;
+    background-image: linear-gradient(180deg, #e4cc9c 0%, #c8b078 100%);
+    border-bottom: 1px solid #6a4828;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  }
+  .picker-header-title {
+    font-weight: 700; font-size: 13px; letter-spacing: 1.5px;
+    color: #2a1a0a;
+    font-variant: small-caps;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+  }
+  #picker-back {
+    display:none;
+    background: linear-gradient(180deg, #4a2a14 0%, #2a1a0a 100%);
+    color:#f4ecd8;
+    border: 1px solid #1a0a00;
+    padding: 5px 12px;
+    font-family: 'Iowan Old Style', Georgia, serif;
+    font-size: 10px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    font-variant: small-caps;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  .ornate-btn {
+    background: linear-gradient(180deg, #4a2a14 0%, #2a1a0a 100%);
+    color: #f4ecd8;
+    border: 1px solid #1a0a00;
+    padding: 4px 12px;
+    font-family: 'Iowan Old Style', Georgia, serif;
+    font-size: 10px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    font-variant: small-caps;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  .ornate-btn.gold {
+    background: linear-gradient(180deg, #8a5a1a 0%, #5a3a0a 100%);
+    border-color: #2a1a00;
+  }
+  .ornate-btn.purple {
+    background: linear-gradient(180deg, #5a2a6a 0%, #2a0a3a 100%);
+    border-color: #1a0a1a;
+  }
+  .ornate-btn.green {
+    background: linear-gradient(180deg, #2a6a3a 0%, #1a4a2a 100%);
+  }
+  .item-card {
+    background-color: #f4e8c8;
+    background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 30%, rgba(120,80,40,0.1) 100%);
+    border: 1px solid #8b6f47;
+    border-radius: 2px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    color: #2a1a0a;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    position: relative;
+  }
+  .item-card.locked {
+    background-color: #d8cca8;
+    background-image: repeating-linear-gradient(45deg, transparent 0, transparent 8px, rgba(120,80,40,0.05) 8px, rgba(120,80,40,0.05) 16px);
+    color: #6a5a4a;
+    opacity: 0.75;
+  }
+  .item-card.selected {
+    background-color: #ead8a8;
+    border-width: 2px;
+    border-color: #6a4828;
+    box-shadow: 0 0 0 1px #d4a848 inset, 0 2px 6px rgba(0,0,0,0.15);
+  }
+  .tier-badge {
+    font-weight: 700; font-size: 11px;
+    font-variant: small-caps;
+    letter-spacing: 1px;
+    padding: 2px 6px;
+    border-radius: 1px;
+  }
+  .tier-1 { color: #2a4a1a; background: rgba(74,106,58,0.15); }
+  .tier-2 { color: #6a3a0a; background: rgba(138,90,26,0.15); }
+  .tier-3 { color: #6a1a0a; background: rgba(138,58,26,0.15); }
+  .tier-4 { color: #2a1a4a; background: rgba(74,42,106,0.15); }
+  /* Cinematic overlay */
+  #cinema-overlay {
+    display:none;
+    position: absolute; inset: 0;
+    background-color: #0a0604;
+    background-image:
+      radial-gradient(ellipse at center, rgba(60,30,10,0.6) 0%, transparent 70%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3'/><feColorMatrix values='0 0 0 0 0.2  0 0 0 0 0.12  0 0 0 0 0.05  0 0 0 0.4 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    z-index: 5;
+    padding: 20px;
+    align-items: center; justify-content: center; flex-direction: column;
+    font-family: 'Iowan Old Style', Georgia, serif;
+    animation: fadein 0.4s ease-out;
+  }
+  @keyframes fadein {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  #cinema-card {
+    background-color: #f0e4c8;
+    background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 30%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='5'/><feColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.32  0 0 0 0 0.18  0 0 0 0.1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    border: 1px solid #5a3a1a;
+    padding: 22px 20px 20px;
+    max-width: 340px; width: 100%;
+    color: #2a1a0a;
+    box-shadow: 0 0 0 4px #1a0e06, 0 0 0 5px #d4a848, 0 8px 32px rgba(0,0,0,0.7);
+    position: relative;
+  }
+  #cinema-card::before, #cinema-card::after {
+    content: ""; position: absolute;
+    width: 24px; height: 24px;
+    border: 1px solid #8a6a3a;
+  }
+  #cinema-card::before { top: 4px; left: 4px; border-right: none; border-bottom: none; }
+  #cinema-card::after { bottom: 4px; right: 4px; border-left: none; border-top: none; }
+  #cinema-corner {
+    position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+    font-size: 9px; color: #8a6a4a; letter-spacing: 2px;
+    font-variant: small-caps; opacity: 0.7;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.9; }
+  }
+  #cinema-portrait {
+    width: 90px; height: 90px;
+    margin: 0 auto 14px;
+    background-color: #d4c0a0;
+    background-image: linear-gradient(180deg, #e0ccab 0%, #b09870 100%);
+    border: 2px solid #6a4828;
+    box-shadow: 0 0 0 1px #d4a848;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #cinema-eyebrow {
+    font-size: 10px; color: #6a3a0a;
+    letter-spacing: 2.5px;
+    text-align: center;
+    font-variant: small-caps;
+    margin-bottom: 4px;
+  }
+  #cinema-title {
+    font-size: 22px; font-weight: 700;
+    text-align: center;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    color: #1a0a00;
+  }
+  #cinema-subtitle {
+    font-size: 11px; color: #6a5a3a;
+    text-align: center; font-style: italic;
+    font-variant: small-caps;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+  }
+  #cinema-quote {
+    font-size: 14px; line-height: 1.7;
+    font-style: italic;
+    color: #3a2a1a;
+    text-align: center;
+    padding: 14px 8px;
+    border-top: 1px solid #b8a070;
+    border-bottom: 1px solid #b8a070;
+    margin-bottom: 12px;
+  }
+  #cinema-meta {
+    font-size: 11px; color: #4a3a2a;
+    text-align: center; line-height: 1.7;
+  }
+  /* Standard overlay (results, intro, etc) */
+  #overlay {
+    position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+    display: none; align-items: center; justify-content: center;
+    pointer-events: none; z-index: 3;
+    padding: 0 16px;
+  }
+  #card {
+    background-color: #f0e4c8;
+    background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 30%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.32  0 0 0 0 0.18  0 0 0 0.08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    border: 1px solid #5a3a1a;
+    padding: 18px 20px;
+    min-width: 260px;
+    max-width: 350px;
+    pointer-events: auto;
+    text-align: center;
+    font-family: 'Iowan Old Style', Georgia, serif;
+    color: #2a1a0a;
+    box-shadow: 0 0 0 3px #1a0e06, 0 0 0 4px #d4a848, 0 6px 24px rgba(0,0,0,0.5);
+  }
+  #card-title {
+    font-size: 18px; font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+    font-variant: small-caps;
+  }
+  #card-body {
+    font-size: 13px; color: #4a3a2a;
+    line-height: 1.6; margin-bottom: 14px;
+  }
+  #card-btn {
+    background: linear-gradient(180deg, #4a2a14 0%, #2a1a0a 100%);
+    color: #f4ecd8;
+    border: 1px solid #1a0a00;
+    padding: 8px 22px;
+    font-family: 'Iowan Old Style', Georgia, serif;
+    letter-spacing: 1.5px;
+    font-variant: small-caps;
+    cursor: pointer;
+    font-size: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+  #footer-tip {
+    padding: 7px 12px;
+    background-color: #ead8ae;
+    background-image: linear-gradient(180deg, transparent 0%, rgba(120,80,40,0.15) 100%);
+    border-top: 1px solid #6a4828;
+    font-size: 10px;
+    color: #5a4a3a;
+    text-align: center;
+    font-style: italic;
+    flex-shrink: 0;
+  }
+  /* Audio control */
+  #audio-toggle {
+    position: absolute;
+    top: 8px; right: 12px;
+    width: 28px; height: 28px;
+    background: rgba(58,42,26,0.6);
+    border: 1px solid #d4a848;
+    border-radius: 50%;
+    color: #f4ecd8;
+    font-size: 14px;
+    cursor: pointer;
+    z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+  }
+  /* Ability button */
+  #ability-btn {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 58px; height: 58px;
+    background: radial-gradient(circle at 30% 30%, #6a4828, #3a2010);
+    border: 2px solid #d4a848;
+    border-radius: 50%;
+    color: #f4ecd8;
+    font-size: 20px;
+    cursor: pointer;
+    z-index: 11;
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5), 0 0 0 1px #1a0e06;
+    transition: transform 0.08s;
+    font-family: 'Iowan Old Style', Georgia, serif;
+  }
+  #ability-btn.visible { display: flex; }
+  #ability-btn.ready {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5), 0 0 0 1px #1a0e06, 0 0 16px rgba(212,168,72,0.6);
+    animation: pulse-ready 1.8s ease-in-out infinite;
+  }
+  #ability-btn.cooldown {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  #ability-btn.active {
+    background: radial-gradient(circle at 30% 30%, #d4a848, #8a5a1a);
+    animation: pulse-active 0.5s ease-in-out infinite;
+  }
+  #ability-btn:active { transform: translateX(-50%) scale(0.92); }
+  #ability-btn-label { font-size: 22px; pointer-events: none; }
+  #ability-btn-cd {
+    position: absolute;
+    bottom: -14px; left: 50%; transform: translateX(-50%);
+    font-size: 9px;
+    color: #d4a848;
+    font-variant: small-caps;
+    letter-spacing: 1px;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  @keyframes pulse-ready {
+    0%, 100% { box-shadow: 0 2px 8px rgba(0,0,0,0.5), 0 0 0 1px #1a0e06, 0 0 16px rgba(212,168,72,0.6); }
+    50% { box-shadow: 0 2px 8px rgba(0,0,0,0.5), 0 0 0 1px #1a0e06, 0 0 22px rgba(212,168,72,0.95); }
+  }
+  @keyframes pulse-active {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) scale(1.08); }
+  }
+</style>
+</head>
+<body>
+<div id="game-root">
+  <div id="hud">
+    <div><span style="color: #5a3a1a;">$</span><span class="currency" id="cash" style="color: #2a1a0a;">0</span></div>
+    <div><span style="color: #6a3a0a;">★</span><span class="currency" id="prestige" style="color:#6a3a0a;">0</span></div>
+    <div><span style="color: #4a2a6a;">◈</span><span class="currency" id="scrip" style="color:#4a2a6a;">0</span></div>
+    <div><span style="color: #5a3a1a;">HP</span><span class="currency" id="hp" style="color: #2a6a3a;">100</span></div>
+    <div id="status-badge" style="font-style: italic; color: #4a3a2a;">Ready</div>
+  </div>
+
+  <div id="nav-bar">
+    <button class="nav-btn active" data-screen="play">Play</button>
+    <button class="nav-btn" data-screen="shop">Workshop</button>
+    <button class="nav-btn" data-screen="store">Store</button>
+  </div>
+
+  <div id="shake-wrap">
+    <canvas id="stage" width="420" height="540"></canvas>
+    <button id="audio-toggle" title="Toggle music">♪</button>
+    <button id="ability-btn" aria-label="Fire ability"><span id="ability-btn-label">⚡</span><span id="ability-btn-cd"></span></button>
+
+    <div id="picker-screen" class="panel-screen paper-texture" style="display:block;">
+      <div class="picker-header">
+        <button id="picker-back">← Back</button>
+        <div class="picker-header-title" id="picker-title">Choose your daredevil</div>
+      </div>
+      <div id="picker-body" style="padding: 12px;"></div>
+    </div>
+
+    <div id="shop-screen" class="panel-screen paper-texture">
+      <div class="picker-header"><div class="picker-header-title">The Workshop</div></div>
+      <div id="stat-bars" style="padding: 12px;"></div>
+    </div>
+
+    <div id="store-screen" class="panel-screen paper-texture">
+      <div id="store-tabs" style="display:flex; background: linear-gradient(180deg, #d8c090 0%, #c8b078 100%); border-bottom: 1px solid #6a4828;">
+        <button class="store-tab active" data-tab="earned" style="flex:1; padding:10px; border:none; background:none; font-size:10px; font-family:'Iowan Old Style',Georgia,serif; cursor:pointer; letter-spacing:1.5px; color:#3a2a1a; font-variant:small-caps; border-bottom:2px solid #6a3a0a; font-weight:700;">★ Prestige</button>
+        <button class="store-tab" data-tab="premium" style="flex:1; padding:10px; border:none; background:none; font-size:10px; font-family:'Iowan Old Style',Georgia,serif; cursor:pointer; letter-spacing:1.5px; color:#3a2a1a; font-variant:small-caps; border-bottom:2px solid transparent;">◈ Scrip</button>
+        <button class="store-tab" data-tab="buy" style="flex:1; padding:10px; border:none; background:none; font-size:10px; font-family:'Iowan Old Style',Georgia,serif; cursor:pointer; letter-spacing:1.5px; color:#3a2a1a; font-variant:small-caps; border-bottom:2px solid transparent;">Buy Scrip</button>
+      </div>
+      <div id="store-body" style="padding:12px;"></div>
+    </div>
+
+    <div id="cinema-overlay">
+      <div id="cinema-card">
+        <div id="cinema-portrait"><canvas id="portrait-canvas" width="86" height="86"></canvas></div>
+        <div id="cinema-eyebrow">eyebrow</div>
+        <div id="cinema-title">Title</div>
+        <div id="cinema-subtitle">subtitle</div>
+        <div id="cinema-quote">quote</div>
+        <div id="cinema-meta">meta</div>
+        <div id="cinema-corner">tap to continue</div>
+      </div>
+    </div>
+
+    <div id="overlay">
+      <div id="card">
+        <div id="card-title">Over the Falls</div>
+        <div id="card-body" style="font-style: italic;">A daredevil's ledger, 1899.</div>
+        <button id="card-btn">Begin</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer-tip">Tap = spin · Hold = flip · Two fingers = corkscrew</div>
+</div>
+
+<!-- AUDIO: To add Victorian-era music, place an MP3 in the same folder as this HTML and update the src below. -->
+<!-- Recommended free sources: pixabay.com/music/search/victorian, musopen.org, freemusicarchive.org -->
+<!-- Suggested track types: solo piano nocturne, salon music, parlor waltz. Keep it slow/contemplative for ambient loop. -->
+<audio id="bg-music" loop>
+  <source src="music_victorian_loop.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+(function(){
+  // ===== DOM REFS =====
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  const shakeWrap = document.getElementById('shake-wrap');
+  const pickerScreen = document.getElementById('picker-screen');
+  const pickerBody = document.getElementById('picker-body');
+  const pickerTitle = document.getElementById('picker-title');
+  const pickerBack = document.getElementById('picker-back');
+  const shopScreen = document.getElementById('shop-screen');
+  const storeScreen = document.getElementById('store-screen');
+  const statBars = document.getElementById('stat-bars');
+  const storeBody = document.getElementById('store-body');
+  const storeTabs = document.querySelectorAll('.store-tab');
+  const navBtns = document.querySelectorAll('.nav-btn');
+  const cashEl = document.getElementById('cash');
+  const prestigeEl = document.getElementById('prestige');
+  const scripEl = document.getElementById('scrip');
+  const hpEl = document.getElementById('hp');
+  const statusBadge = document.getElementById('status-badge');
+  const overlay = document.getElementById('overlay');
+  const cardTitle = document.getElementById('card-title');
+  const cardBody = document.getElementById('card-body');
+  const cardBtn = document.getElementById('card-btn');
+  const cinemaOverlay = document.getElementById('cinema-overlay');
+  const cinemaPortrait = document.getElementById('portrait-canvas');
+  const cinemaEyebrow = document.getElementById('cinema-eyebrow');
+  const cinemaTitle = document.getElementById('cinema-title');
+  const cinemaSubtitle = document.getElementById('cinema-subtitle');
+  const cinemaQuote = document.getElementById('cinema-quote');
+  const cinemaMeta = document.getElementById('cinema-meta');
+  const audioToggle = document.getElementById('audio-toggle');
+  const bgMusic = document.getElementById('bg-music');
+  const abilityBtn = document.getElementById('ability-btn');
+  const abilityBtnLabel = document.getElementById('ability-btn-label');
+  const abilityBtnCd = document.getElementById('ability-btn-cd');
+  let W = 420, H = 540;
+
+  function resizeCanvas(){
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    W = rect.width; H = rect.height;
+  }
+
+  // ===== DATA =====
+  const PERSONAS = [
+    { id:'taylor', name:'Annie Edson Taylor', year:1901, title:'The Pioneer',
+      bio:'A 63-year-old schoolteacher from Bay City, Michigan. Widowed in the Civil War. Went over Niagara on her birthday in a Kentucky oak barrel with a heart-shaped pillow she had brought herself.',
+      quote:'"I would sooner walk up to the mouth of a cannon, knowing it was going to blow me to pieces, than make another trip over the Falls."',
+      attrib:'After the descent. Niagara Falls, October 1901.',
+      stats:{hull:1,padding:0,aero:0}, vessel:'oakbarrel',
+      quirk:{id:'pillow',name:'Lucky Pillow',desc:'Once per run, DISASTER becomes Messy.'},
+      ability:{id:'steady',name:'Steady',desc:'Brace the barrel — hazards deal no damage for 2s.',cooldown:10,duration:2},
+      unlockReq:{type:'default'}, unlocked:true },
+    { id:'leach', name:'Bobby Leach', year:1911, title:'The Showman',
+      bio:'Cornish circus stuntman. The first man over Niagara, in a steel drum. Broke both kneecaps and his jaw on the descent. Fifteen years later, on tour in New Zealand, he slipped on an orange peel and died from the resulting infection.',
+      quote:'"I shall make the trip — or I shall die in the attempt. There is no third course."',
+      attrib:'Press conference. Niagara Falls, July 1911.',
+      stats:{hull:0,padding:1,aero:0}, vessel:'steeldrum',
+      quirk:{id:'bravado',name:'Bravado',desc:'+25% stunt score. Sloppy landings cost 2× HP. Starts at 20% hype.'},
+      ability:{id:'showboat',name:'Showboat',desc:'+100% stunt score for 3s. Take 50% more damage during.',cooldown:8,duration:3},
+      unlockReq:{type:'fall',id:'niagara',label:'Clear Niagara Falls'}, unlocked:false },
+    { id:'lussier', name:'Jean Lussier', year:1928, title:'The Engineer',
+      bio:'A French-Canadian machinist from Springfield, Massachusetts. Spent his entire life savings — fifteen hundred dollars — to design and build a six-foot rubber ball reinforced with steel bands and lined with thirty-two truck inner tubes.',
+      quote:'"Stephens used a wooden barrel. That was his mistake. The river will not be defeated by oak."',
+      attrib:'Letter to a sponsor. Akron, Ohio, June 1928.',
+      stats:{hull:0,padding:0,aero:1}, vessel:'rubberball',
+      quirk:{id:'rubber',name:'Rubber Ball',desc:'50% less damage from hazards. -10% stunt score (less dramatic tumble).'},
+      ability:{id:'bounce',name:'Overinflate',desc:'Extra bounce — next hazard is repelled instead of hitting.',cooldown:12,duration:5},
+      unlockReq:{type:'tier',val:2,label:'Clear any Tier II fall'}, unlocked:false },
+    { id:'soucek', name:'Karel Soucek', year:1984, title:'The Modern',
+      bio:'Hamilton, Ontario stuntman. A bright red barrel painted with his own name. The first to survive Niagara in twenty-three years. The following winter, attempting to restage the stunt indoors at the Houston Astrodome, the barrel split open and killed him.',
+      quote:'"I am the last of Niagara\'s daredevils. After me, no one."',
+      attrib:'Promotional interview. Niagara Falls, July 1984.',
+      stats:{hull:1,padding:1,aero:-1}, vessel:'redbarrel',
+      quirk:{id:'press',name:'Press Magnet',desc:'+50% hype multiplier. $200 per run for press fees.'},
+      ability:{id:'presstunt',name:'Press Stunt',desc:'Crowd goes wild — hype fills to 100% instantly.',cooldown:15,duration:0},
+      unlockReq:{type:'tier',val:3,label:'Clear any Tier III fall'}, unlocked:false },
+    { id:'cipher', name:'The Daredevil', year:190, title:"The Society's Own",
+      bio:"Recruited in eighteen-ninety-something by the Patent Astronautical Society of Great Britain. The records do not list a name. The vessel\'s blueprints remain sealed in the Society\'s archive at Greenwich. The descent ledgers list nine separate falls, the last of which is on Mars.",
+      quote:'"They will not need to know who I was. Only that the descent was made."',
+      attrib:'Society archive, classified.',
+      stats:{hull:0,padding:0,aero:0}, vessel:'rocket',
+      quirk:{id:'adapt',name:'Adaptable',desc:'Neutral stats. The Society\'s barrel flies — it does not fall.'},
+      ability:{id:'thrust',name:'Thrust',desc:'Ignite engines — slow descent dramatically for 3s.',cooldown:10,duration:3},
+      unlockReq:{type:'tier',val:4,label:'Clear any Tier IV fall'}, unlocked:false }
+  ];
+
+  // Weather modifiers — rolled per run, shown in intro
+  const WEATHER = [
+    { id:'clear',     name:'Clear skies',     desc:'A calm day. No modifiers.',            dangerMod:0,    rewardMod:0,    weight:40 },
+    { id:'rain',      name:'Heavy rain',      desc:'Slick vessel. Stunts are -10% points.', dangerMod:0.2,  rewardMod:0.15, weight:20 },
+    { id:'fog',       name:'Thick fog',       desc:'Hazards appear late. More danger.',    dangerMod:0.3,  rewardMod:0.25, weight:15 },
+    { id:'wind',      name:'High wind',       desc:'Lateral drift increased.',              dangerMod:0.15, rewardMod:0.15, weight:15 },
+    { id:'ceremony',  name:'Press day',       desc:'Crowd triple size. Hype builds faster.', dangerMod:0,    rewardMod:0.35, weight:10 },
+  ];
+
+  const FALLS = [
+    { id:'niagara',  name:'Niagara Falls',   tier:1, height:51,    danger:1.0, fee:0,    hullReq:1, unlocked:true,  mechanic:'base', theme:'forest',
+      flavor:'Horseshoe Falls, on the border of New York and Ontario. One hundred sixty-seven feet of green thunder. The river drops two and a half thousand tons of water every second.',
+      epitaph:'No one had ever survived this until Annie did.', duration:9 },
+    { id:'victoria', name:'Victoria Falls',  tier:1, height:108,   danger:1.4, fee:200,  hullReq:1, unlocked:false, mechanic:'wind', theme:'savanna',
+      flavor:'Mosi-oa-Tunya — the Smoke that Thunders. The widest curtain of falling water in the world. The wind off the gorge can throw a man twenty feet sideways.',
+      epitaph:'The locals do not go near it.', duration:10 },
+    { id:'iguazu',   name:'Iguazu Falls',    tier:1, height:82,    danger:1.5, fee:400,  hullReq:2, unlocked:false, mechanic:'ledges', theme:'jungle',
+      flavor:'Two hundred seventy-five separate cascades on the border of Brazil and Argentina. The largest, the Devil\'s Throat, is U-shaped. Some ledges catch you on the way down. Some shred you.',
+      epitaph:'Hit the ledges. Or do not.', duration:10 },
+    { id:'angel',    name:'Angel Falls',     tier:2, height:979,   danger:2.2, fee:800,  hullReq:3, unlocked:false, mechanic:'deeplong', theme:'tepui',
+      flavor:'Auyán-tepui, Venezuela. The water falls so far it becomes mist before reaching the bottom. The world\'s tallest uninterrupted waterfall. Stunts performed in the upper half are seen by no one.',
+      epitaph:'Save the drama for the bottom.', duration:14 },
+    { id:'tugela',   name:'Tugela Falls',    tier:2, height:948,   danger:2.3, fee:1100, hullReq:4, unlocked:false, mechanic:'rocks', theme:'cliff',
+      flavor:'The Drakensberg Escarpment of South Africa. The descent is interrupted, again and again, by ledges of black basalt thrown out from the cliff face like shelves.',
+      epitaph:'The boulders will find you.', duration:13 },
+    { id:'frozen',   name:'Frozen Niagara',  tier:2, height:51,    danger:2.5, fee:1400, hullReq:4, unlocked:false, mechanic:'ice', theme:'ice',
+      flavor:'February of nineteen-twelve. The cataract has frozen mid-fall — the only time in recorded history. The stunt is now a passage through ice shards the size of a child.',
+      epitaph:'The river is silent today.', duration:11 },
+    { id:'denmark',  name:'Denmark Strait',  tier:3, height:3500,  danger:3.8, fee:2500, hullReq:6, unlocked:false, mechanic:'underwater', theme:'deep',
+      flavor:'A submarine cataract beneath the North Atlantic. Cold dense water from the Greenland Sea pours over a ridge in the dark, three and a half kilometers deep. The largest waterfall on Earth, and no one will ever see it.',
+      epitaph:'No witnesses. No light. Only pressure.', duration:18 },
+    { id:'verona',   name:'Verona Rupes',    tier:4, height:20000, danger:5.0, fee:5000, hullReq:8, unlocked:false, mechanic:'zerog', theme:'miranda',
+      flavor:'Miranda, fifth moon of Uranus. A twenty-kilometer cliff with almost no atmosphere to slow your fall. In life, the descent would take twelve minutes. The Society\'s barrel will not take that long.',
+      epitaph:'The Society funds your descent. Reasons unstated.', duration:20 },
+    { id:'olympus',  name:'Olympus Mons',    tier:4, height:21000, danger:6.0, fee:8500, hullReq:9, unlocked:false, mechanic:'volcano', theme:'mars',
+      flavor:'The largest volcano in the solar system. The Society has built a launch rig on the caldera. Thermal plumes rise from the slopes below — they will lift you, if you let them.',
+      epitaph:'Ride the plumes. They want you to.', duration:22 },
+  ];
+
+  const BASE_STATS = { hull: 1, padding: 1, aero: 1 };
+  const STAT_COST = [0, 100, 300, 700, 1500, 3000];
+  const STAT_MAX = 5;
+
+  const COSMETICS = [
+    { id:'pine_default',    category:'vessel_skin',  name:'Pine cask',          desc:'Every daredevil starts here.',                           source:'default', cost:0,    owned:true },
+    { id:'oak_reinforced',  category:'vessel_skin',  name:'Reinforced oak',     desc:'After Annie\'s recipe. Seven iron hoops.',              source:'prestige', cost:10,  owned:false },
+    { id:'splash_aqua',     category:'splash_color', name:'Aqua splash',        desc:'The water remembers your colors.',                       source:'prestige', cost:5,   owned:false },
+    { id:'splash_gold',     category:'splash_color', name:'Gilt splash',        desc:'For the showman.',                                       source:'prestige', cost:15,  owned:false },
+    { id:'pennant_union',   category:'pennant',      name:'Union pennant',      desc:'A small flag, sturdily affixed.',                       source:'prestige', cost:12,  owned:false },
+    { id:'brass_riveted',   category:'vessel_skin',  name:'Brass-riveted',      desc:'Polished brass. Mirror finish.',                        source:'scrip', cost:15, owned:false },
+    { id:'porcelain',       category:'vessel_skin',  name:'Porcelain',          desc:'For the aesthete. Absolutely impractical.',             source:'scrip', cost:25, owned:false },
+    { id:'splash_violet',   category:'splash_color', name:'Violet splash',      desc:'An unnatural hue.',                                      source:'scrip', cost:10, owned:false },
+    { id:'pennant_royal',   category:'pennant',      name:'Royal standard',     desc:'Improbable heraldic device.',                            source:'scrip', cost:15, owned:false },
+  ];
+  const SCRIP_BUNDLES = [
+    { id:'scrip_small',  name:'Handful of Scrip',  amount:50,   price:'$0.99' },
+    { id:'scrip_medium', name:'Purse of Scrip',    amount:250,  price:'$3.99' },
+    { id:'scrip_large',  name:'Strongbox of Scrip',amount:600,  price:'$8.99', tag:'popular' },
+  ];
+
+  const state = {
+    cash: 0, prestige: 0, scrip: 0,
+    rep: 1, hp: 100, maxHp: 100, totalEarned: 0, currentFall: 0,
+    currentPersona: 'taylor',
+    screen: 'play', phase: 'menu',
+    pickerStage: 'devil',
+    storeTab: 'earned',
+    holdStart: 0, aimPower: 0, launchAccuracy: 0,
+    fallProgress: 0, fallSpeed: 0,
+    stuntScore: 0, comboCount: 0, comboTimer: 0,
+    crowdHype: 0, runResult: null,
+    shakeT: 0, shakeMag: 0,
+    flashT: 0, flashText: '', flashColor: '#eab308', flashScale: 1,
+    particles: [],
+    pointerIsDown: false, pointerDownTime: 0,
+    activePointers: 0, corkscrewFired: false, flipFired: false,
+    splashT: 0,
+    barrelX: 0, barrelY: 0, barrelRot: 0, barrelVRot: 0, barrelVX: 0,
+    fallsCleared: new Set(),
+    fallsSeen: new Set(),
+    personasIntroduced: new Set(['taylor']),
+    tiersCleared: new Set(),
+    mechState: {},
+    recovering: false, hazards: [],
+    pillowUsed: false,
+    cinemaStep: 0,
+    cinemaShowDevil: false,
+    cinemaShowFall: false,
+    musicWanted: false,
+    // NEW v8 fields:
+    inputMode: 'tilt',         // 'tilt' or 'touch' — how lateral movement is controlled
+    tiltPermissionGranted: false,
+    tiltX: 0,                  // raw tilt reading
+    touchLateralDir: 0,        // -1, 0, or 1 based on edge tap
+    abilityReady: true,
+    abilityCooldown: 0,
+    abilityActive: false,
+    abilityTimer: 0,
+    breathMeter: 1.0,          // underwater
+    heatMeter: 0,              // volcano (builds up)
+    abilityFireBtn: { pressed: false },
+    bonuses: [],               // scrolling bonus pickups
+    weather: null,             // current run's weather
+    forkChoice: null,          // 'left' or 'right' after a fork decision
+    forkTriggered: false,
+    unconscious: false,        // mid-run HP=0 state
+    personaMastery: {},        // { taylor: 3, leach: 0, ... }
+    equipped: { vessel_skin:'pine_default', splash_color:null, nameplate:null, pennant:null, announcer:null },
+  };
+
+  function currentPersona(){ return PERSONAS.find(p => p.id === state.currentPersona); }
+  function currentFall(){ return FALLS[state.currentFall]; }
+  function effectiveStats(){
+    const p = currentPersona();
+    return {
+      hull: BASE_STATS.hull + p.stats.hull,
+      padding: BASE_STATS.padding + p.stats.padding,
+      aero: Math.max(1, BASE_STATS.aero + p.stats.aero),
+    };
+  }
+
+  function setOverlay(title, body, btnText, onClick){
+    cardTitle.textContent = title;
+    cardBody.innerHTML = body;
+    cardBtn.textContent = btnText;
+    cardBtn.onclick = onClick;
+    overlay.style.display = 'flex';
+  }
+
+  function updateHud(){
+    cashEl.textContent = state.cash;
+    prestigeEl.textContent = state.prestige;
+    scripEl.textContent = state.scrip;
+    hpEl.textContent = state.hp;
+    hpEl.style.color = state.hp > 60 ? '#2a6a3a' : state.hp > 30 ? '#a06820' : '#8a2020';
+    if (state.phase === 'falling' || state.phase === 'aiming'){
+      statusBadge.textContent = currentFall().name.split(' ')[0];
+    } else if (state.screen === 'play' && state.pickerStage === 'devil'){
+      statusBadge.textContent = 'Choosing...';
+    } else if (state.screen === 'play' && state.pickerStage === 'fall'){
+      statusBadge.textContent = currentPersona().name.split(' ').slice(-1)[0];
+    } else {
+      statusBadge.textContent = 'Ready';
+    }
+  }
+
+  function shake(mag, dur){ state.shakeMag = mag; state.shakeT = dur; }
+  function flash(text, color){ state.flashText = text; state.flashColor = color || '#eab308'; state.flashT = 1; state.flashScale = 0.6; }
+  function spawnParticles(x, y, count, color, speed){
+    for (let i = 0; i < count; i++){
+      const a = Math.random() * Math.PI * 2;
+      const s = speed * (0.5 + Math.random());
+      state.particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 1, color, size: 2 + Math.random()*3 });
+    }
+  }
+
+  function switchScreen(name){
+    state.screen = name;
+    canvas.style.display = (name === 'play' && (state.phase === 'aiming' || state.phase === 'falling' || state.phase === 'splashing' || state.phase === 'results')) ? 'block' : 'none';
+    pickerScreen.style.display = (name === 'play' && state.phase === 'menu') ? 'block' : 'none';
+    shopScreen.style.display = name === 'shop' ? 'block' : 'none';
+    storeScreen.style.display = name === 'store' ? 'block' : 'none';
+    overlay.style.display = (name === 'play' && state.phase === 'results') ? 'flex' : 'none';
+    // Hide ability button whenever not in the falling phase
+    if (abilityBtn && state.phase !== 'falling'){
+      abilityBtn.classList.remove('visible');
+    }
+    navBtns.forEach(b => {
+      const active = b.dataset.screen === name;
+      if (active) b.classList.add('active'); else b.classList.remove('active');
+    });
+    if (name === 'play' && state.phase === 'menu') renderPicker();
+    if (name === 'shop') renderShop();
+    if (name === 'store') renderStore();
+    if (name === 'play' && state.phase === 'aiming') resizeCanvas();
+    updateHud();
+  }
+
+  navBtns.forEach(b => b.addEventListener('click', () => {
+    if (['falling','aiming','splashing'].includes(state.phase)) return;
+    if (b.dataset.screen === 'play'){
+      state.phase = 'menu'; state.pickerStage = 'devil';
+    }
+    switchScreen(b.dataset.screen);
+  }));
+
+  storeTabs.forEach(b => b.addEventListener('click', () => {
+    storeTabs.forEach(t => { t.style.borderBottomColor = 'transparent'; t.style.fontWeight = '400'; });
+    b.style.borderBottomColor = b.dataset.tab === 'earned' ? '#6a3a0a' : b.dataset.tab === 'premium' ? '#4a2a6a' : '#2a1a0a';
+    b.style.fontWeight = '700';
+    state.storeTab = b.dataset.tab;
+    renderStore();
+  }));
+
+  pickerBack.addEventListener('click', () => {
+    state.pickerStage = 'devil';
+    renderPicker();
+    updateHud();
+  });
+
+  // ===== AUDIO =====
+  bgMusic.volume = 0.4;
+  audioToggle.addEventListener('click', () => {
+    state.musicWanted = !state.musicWanted;
+    if (state.musicWanted){
+      bgMusic.play().catch(() => {
+        // Likely no music file present; flash a hint
+        flash('NO MUSIC FILE FOUND', '#aa3a3a');
+        state.musicWanted = false;
+        audioToggle.textContent = '♪';
+        return;
+      });
+      audioToggle.textContent = '♬';
+      audioToggle.style.color = '#d4a848';
+    } else {
+      bgMusic.pause();
+      audioToggle.textContent = '♪';
+      audioToggle.style.color = '#f4ecd8';
+    }
+  });
+
+  // ===== TILT CONTROL =====
+  // Uses DeviceOrientationEvent for left/right tilt. Needs permission on iOS 13+.
+  function requestTiltPermission(){
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function'){
+      // iOS: explicit permission request
+      DeviceOrientationEvent.requestPermission().then(response => {
+        if (response === 'granted'){
+          state.tiltPermissionGranted = true;
+          window.addEventListener('deviceorientation', handleTilt);
+          flash('TILT ENABLED', '#2a6a3a');
+        } else {
+          flash('TILT DENIED — USING TOUCH', '#a0671a');
+          state.inputMode = 'touch';
+        }
+      }).catch(() => {
+        state.inputMode = 'touch';
+        flash('TILT UNAVAILABLE', '#a0671a');
+      });
+    } else if (typeof DeviceOrientationEvent !== 'undefined'){
+      // Android/older iOS: no permission needed
+      state.tiltPermissionGranted = true;
+      window.addEventListener('deviceorientation', handleTilt);
+    } else {
+      // Desktop: tilt not available
+      state.inputMode = 'touch';
+    }
+  }
+
+  function handleTilt(e){
+    // gamma is left/right tilt, -90 to 90. Clamp and normalize.
+    const gamma = e.gamma || 0;
+    // Dead zone + scaling. Tilt ~15deg for full movement.
+    const deadZone = 3;
+    let signal = 0;
+    if (Math.abs(gamma) > deadZone){
+      signal = (gamma - Math.sign(gamma) * deadZone) / 15;
+      signal = Math.max(-1, Math.min(1, signal));
+    }
+    state.tiltX = signal;
+  }
+
+  // ===== ABILITY SYSTEM =====
+  function fireAbility(){
+    const p = currentPersona();
+    if (!p || !p.ability) return;
+    if (!state.abilityReady) return;
+    if (state.phase !== 'falling') return;
+    const ab = p.ability;
+    state.abilityReady = false;
+    state.abilityCooldown = ab.cooldown;
+    if (ab.duration > 0){
+      state.abilityActive = true;
+      state.abilityTimer = ab.duration;
+    }
+    // Per-ability effects
+    switch (ab.id){
+      case 'steady':
+        // Flag handled in updateMechanic — hazards deal no damage while abilityActive
+        flash('STEADY — BRACED', '#3a6aaa');
+        spawnParticles(state.barrelX, state.barrelY, 14, '#a0c8f0', 2.5);
+        if (navigator.vibrate) navigator.vibrate(25);
+        break;
+      case 'showboat':
+        // Flag handled in triggerStunt and updateMechanic damage
+        flash('SHOWBOAT!', '#f97316');
+        spawnParticles(state.barrelX, state.barrelY, 24, '#fbbf24', 4);
+        state.crowdHype = Math.min(1, state.crowdHype + 0.15);
+        if (navigator.vibrate) navigator.vibrate(30);
+        break;
+      case 'bounce':
+        // Flag handled in updateMechanic — next hazard bounces off
+        flash('OVERINFLATED', '#8a5a1a');
+        spawnParticles(state.barrelX, state.barrelY, 18, '#d4a848', 3);
+        if (navigator.vibrate) navigator.vibrate(20);
+        break;
+      case 'presstunt':
+        state.crowdHype = 1.0;
+        state.stuntScore += 100; // small bonus for the press stunt itself
+        flash('PRESS STUNT — CROWD FRENZY!', '#ac2a6a');
+        spawnParticles(state.barrelX, state.barrelY, 30, '#f0c850', 5);
+        shake(10, 0.4);
+        if (navigator.vibrate) navigator.vibrate([40, 20, 40]);
+        break;
+      case 'thrust':
+        // Handled in updateMechanic — slow fall dramatically
+        flash('THRUST ENGAGED', '#4a6aaa');
+        spawnParticles(state.barrelX, state.barrelY + 20, 40, '#ff8a3a', 6);
+        shake(6, 0.3);
+        if (navigator.vibrate) navigator.vibrate(35);
+        break;
+    }
+    updateAbilityButton();
+  }
+
+  function tickAbilityCooldown(dt){
+    if (state.phase !== 'falling'){ return; }
+    if (state.abilityActive){
+      state.abilityTimer -= dt;
+      if (state.abilityTimer <= 0){
+        state.abilityActive = false;
+        state.abilityTimer = 0;
+      }
+    }
+    if (!state.abilityReady && state.abilityCooldown > 0){
+      state.abilityCooldown -= dt;
+      if (state.abilityCooldown <= 0){
+        state.abilityCooldown = 0;
+        if (!state.abilityActive){
+          state.abilityReady = true;
+          flash('ABILITY READY', '#2a8a4a');
+        }
+      }
+    }
+  }
+
+  function updateAbilityButton(){
+    const p = currentPersona();
+    if (!p || !p.ability){
+      abilityBtn.classList.remove('visible', 'ready', 'cooldown', 'active');
+      return;
+    }
+    if (state.phase !== 'falling'){
+      abilityBtn.classList.remove('visible');
+      return;
+    }
+    abilityBtn.classList.add('visible');
+    abilityBtn.classList.toggle('ready', state.abilityReady && !state.abilityActive);
+    abilityBtn.classList.toggle('cooldown', !state.abilityReady && !state.abilityActive);
+    abilityBtn.classList.toggle('active', state.abilityActive);
+    abilityBtnLabel.textContent = state.abilityActive ? '✦' : '⚡';
+    if (state.abilityActive){
+      abilityBtnCd.textContent = Math.ceil(state.abilityTimer) + 's';
+    } else if (state.abilityReady){
+      abilityBtnCd.textContent = p.ability.name;
+    } else {
+      abilityBtnCd.textContent = Math.ceil(state.abilityCooldown) + 's';
+    }
+  }
+
+  // Attach handler (will be no-op if button not present)
+  if (abilityBtn){
+    abilityBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      fireAbility();
+    });
+    abilityBtn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation(); // prevent canvas from seeing this
+    });
+  }
+  // ===== PICKER =====
+  function renderPicker(){
+    if (state.pickerStage === 'devil'){
+      pickerTitle.textContent = 'Choose your daredevil';
+      pickerBack.style.display = 'none';
+      pickerBody.innerHTML = PERSONAS.map(p => {
+        const stat = (s, v) => v === 0 ? '' : `<span style="color:${v>0?'#2a6a3a':'#8a2020'}; font-weight:700;">${v>0?'+':''}${v} ${s}</span>`;
+        const statLine = ['hull','padding','aero'].map(k => stat(k[0].toUpperCase()+k.slice(1), p.stats[k])).filter(Boolean).join(' · ') || '<span style="color:#6a5a3a;">Balanced</span>';
+
+        if (!p.unlocked){
+          return `<div class="item-card locked" style="position:relative;">
+            <div style="position:absolute; top:50%; right:14px; transform:translateY(-50%); font-size:10px; color:#7a5a3a; letter-spacing:1.5px; font-variant:small-caps;">🔒 locked</div>
+            <div style="font-weight:700; font-size:14px;">${p.name}</div>
+            <div style="font-size:10px; color:#7a6050; letter-spacing:1px; font-variant:small-caps; margin-bottom:6px;">${p.year===190?'19—':p.year} · ${p.title}</div>
+            <div style="font-size:10px; color:#7a6a5a; font-style:italic;">Unlock: ${p.unlockReq.label}</div>
+          </div>`;
+        }
+
+        const runs = state.personaMastery[p.id] || 0;
+        const masteryTier = Math.floor(runs / 10);
+        const masteryDisplay = masteryTier > 0
+          ? `<span style="color:#8a5a1a; font-size:10px; margin-left:6px;" title="Mastery tier ${masteryTier}">${'★'.repeat(Math.min(5, masteryTier))}</span>`
+          : (runs > 0 ? `<span style="color:#7a6a5a; font-size:9px; margin-left:6px;">${runs}/10 to next tier</span>` : '');
+        return `<div class="item-card" style="cursor:pointer;" onclick="window.__pickDevil('${p.id}')">
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <div style="width:54px; height:54px; background: linear-gradient(180deg, #e0ccab 0%, #b09870 100%); border:1px solid #6a4828; flex-shrink:0; display:flex; align-items:center; justify-content:center; box-shadow: 0 1px 2px rgba(0,0,0,0.2);"><canvas class="devil-thumb" data-vessel="${p.vessel}" width="50" height="50"></canvas></div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:700; font-size:14px;">${p.name}${masteryDisplay}</div>
+              <div style="font-size:10px; color:#6a4828; letter-spacing:1px; font-variant:small-caps; margin-bottom:4px;">${p.year===190?'19—':p.year} · ${p.title}</div>
+              <div style="font-size:10px; color:#3a2a1a; margin-bottom:2px;">${statLine}</div>
+              <div style="font-size:10px; color:#5a4a3a; font-style:italic;"><b style="color:#3a2a1a;">${p.quirk.name}.</b> ${p.quirk.desc}</div>
+              <div style="font-size:10px; color:#5a4a3a; margin-top:2px;"><b style="color:#4a2a6a;">⚡ ${p.ability.name}.</b> <span style="font-style:italic;">${p.ability.desc}</span></div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+      setTimeout(() => {
+        document.querySelectorAll('.devil-thumb').forEach(c => {
+          const tctx = c.getContext('2d');
+          tctx.translate(25, 25);
+          drawVesselOnContext(tctx, c.dataset.vessel, 0, 1.0);
+        });
+      }, 0);
+    } else {
+      const p = currentPersona();
+      pickerTitle.textContent = `${p.name} → choose a fall`;
+      pickerBack.style.display = 'block';
+      pickerBody.innerHTML = FALLS.map((f, idx) => {
+        const tierBadge = { 1:'I', 2:'II', 3:'III', 4:'IV' }[f.tier];
+        const canAfford = state.cash >= f.fee;
+        const hullOk = effectiveStats().hull >= f.hullReq;
+        const cleared = state.fallsCleared.has(f.id);
+
+        if (!f.unlocked){
+          if (!hullOk){
+            return `<div class="item-card locked">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:baseline; gap:8px;"><span class="tier-badge tier-${f.tier}">${tierBadge}</span><span style="font-weight:700; font-size:13px;">${f.name}</span></div>
+                <span style="font-size:10px; color:#7a5a3a; font-style:italic;">🔒 Hull ${f.hullReq}+</span>
+              </div>
+              <div style="font-size:10px; color:#7a6050; margin-top:2px; font-variant:small-caps; letter-spacing:0.5px;">${f.height.toLocaleString()}m · danger ${f.danger}× · fee $${f.fee}</div>
+            </div>`;
+          }
+          if (!canAfford){
+            return `<div class="item-card locked">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:baseline; gap:8px;"><span class="tier-badge tier-${f.tier}">${tierBadge}</span><span style="font-weight:700; font-size:13px;">${f.name}</span></div>
+                <span style="font-size:10px; color:#7a5a3a;">🔒 Need $${f.fee}</span>
+              </div>
+              <div style="font-size:10px; color:#7a6050; margin-top:2px; font-variant:small-caps; letter-spacing:0.5px;">${f.height.toLocaleString()}m · danger ${f.danger}×</div>
+            </div>`;
+          }
+          return `<div class="item-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+              <div style="display:flex; align-items:baseline; gap:8px;"><span class="tier-badge tier-${f.tier}">${tierBadge}</span><span style="font-weight:700; font-size:13px;">${f.name}</span></div>
+              <button class="ornate-btn gold" onclick="window.__unlockFall(${idx})">Unlock $${f.fee}</button>
+            </div>
+            <div style="font-size:10px; color:#5a4828; margin-bottom:2px; font-variant:small-caps; letter-spacing:0.5px;">${f.height.toLocaleString()}m · danger ${f.danger}×</div>
+            <div style="font-size:10px; color:#3a2a1a; font-style:italic;">${f.epitaph}</div>
+          </div>`;
+        }
+
+        return `<div class="item-card" style="cursor:pointer;" onclick="window.__pickFall(${idx})">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+            <div style="display:flex; align-items:baseline; gap:8px;"><span class="tier-badge tier-${f.tier}">${tierBadge}</span><span style="font-weight:700; font-size:13px;">${f.name}</span>${cleared?'<span style="font-size:10px; color:#2a6a3a;">✓</span>':''}</div>
+            <button class="ornate-btn" onclick="event.stopPropagation(); window.__pickFall(${idx})">Run →</button>
+          </div>
+          <div style="font-size:10px; color:#5a4828; margin-bottom:2px; font-variant:small-caps; letter-spacing:0.5px;">${f.height.toLocaleString()}m · danger ${f.danger}×</div>
+          <div style="font-size:10px; color:#3a2a1a; font-style:italic;">${f.epitaph}</div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  window.__pickDevil = (id) => {
+    const p = PERSONAS.find(x => x.id === id);
+    if (!p || !p.unlocked) return;
+    state.currentPersona = id;
+    if (id === 'soucek' && state.cash === 0){ state.cash += 500; flash('+$500 START', '#2a6a3a'); }
+    state.pickerStage = 'fall';
+    updateHud();
+    renderPicker();
+  };
+
+  window.__pickFall = (idx) => {
+    state.currentFall = idx;
+    const f = FALLS[idx];
+    if (!f.unlocked) return;
+    // Roll weather for this run
+    state.weather = rollWeather();
+    const showDevilCinema = !state.personasIntroduced.has(state.currentPersona);
+    const showFallCinema = !state.fallsSeen.has(f.id);
+    state.fallsSeen.add(f.id);
+    state.personasIntroduced.add(state.currentPersona);
+    state.cinemaShowDevil = showDevilCinema;
+    state.cinemaShowFall = showFallCinema;
+    if (showDevilCinema || showFallCinema){
+      state.cinemaStep = showDevilCinema ? 0 : 1;
+      cinemaOverlay.style.display = 'flex';
+      showCinemaCard();
+    } else {
+      showQuickIntro();
+    }
+  };
+
+  function rollWeather(){
+    const totalWeight = WEATHER.reduce((s, w) => s + w.weight, 0);
+    let r = Math.random() * totalWeight;
+    for (const w of WEATHER){
+      r -= w.weight;
+      if (r <= 0) return w;
+    }
+    return WEATHER[0];
+  }
+
+  window.__unlockFall = (idx) => {
+    const f = FALLS[idx];
+    if (state.cash >= f.fee && effectiveStats().hull >= f.hullReq){
+      state.cash -= f.fee; f.unlocked = true;
+      updateHud(); renderPicker();
+      flash('UNLOCKED: ' + f.name.toUpperCase(), '#2a6a3a');
+    }
+  };
+
+  // ===== CINEMATIC =====
+  function showCinemaCard(){
+    const p = currentPersona();
+    const f = currentFall();
+    if (state.cinemaStep === 0){
+      cinemaEyebrow.textContent = `${p.year === 190 ? 'Date Unknown' : p.year} · ${p.title}`;
+      cinemaTitle.textContent = p.name;
+      cinemaSubtitle.textContent = p.attrib;
+      cinemaQuote.innerHTML = p.quote;
+      cinemaMeta.innerHTML = `<div style="font-style:italic; color:#3a2a1a; margin-top:4px; line-height:1.7;">${p.bio}</div><div style="font-size:11px; margin-top:10px; color:#6a3a0a; font-variant:small-caps; letter-spacing:1px;"><b>${p.quirk.name}</b> — <span style="text-transform:none; letter-spacing:0; color:#5a4a3a;">${p.quirk.desc}</span></div>`;
+      const pctx = cinemaPortrait.getContext('2d');
+      pctx.clearRect(0, 0, 86, 86);
+      pctx.save();
+      pctx.translate(43, 43);
+      pctx.scale(1.5, 1.5);
+      drawVesselOnContext(pctx, p.vessel, 0, 1);
+      pctx.restore();
+    } else if (state.cinemaStep === 1){
+      const tierBadge = { 1:'Tier I', 2:'Tier II', 3:'Tier III', 4:'Tier IV' }[f.tier];
+      cinemaEyebrow.textContent = `${tierBadge} · Danger ${f.danger}×`;
+      cinemaTitle.textContent = f.name;
+      cinemaSubtitle.textContent = `${f.height.toLocaleString()} meters`;
+      cinemaQuote.innerHTML = f.flavor;
+      const weatherText = state.weather ? `<div style="font-size:10px; color:#4a3a2a; margin-top:10px; padding-top:8px; border-top:1px dashed #b8a070;"><b>${state.weather.name}.</b> <span style="font-style:italic;">${state.weather.desc}</span></div>` : '';
+      cinemaMeta.innerHTML = `<div style="font-style:italic; color:#8a2a2a; font-weight:700; letter-spacing:0.5px;">${f.epitaph}</div>${weatherText}`;
+      const pctx = cinemaPortrait.getContext('2d');
+      pctx.clearRect(0, 0, 86, 86);
+      drawFallThumbnail(pctx, f.theme);
+    }
+  }
+
+  function drawFallThumbnail(c, theme){
+    const themes = {
+      forest: ['#a8b690', '#3a5a3a', '#e8dcc0'],
+      savanna: ['#e4b870', '#8a6040', '#d4a060'],
+      jungle: ['#7aa070', '#3a5a3a', '#5a8050'],
+      tepui: ['#a8b8c8', '#5a4a3a', '#c8d8e8'],
+      cliff: ['#a88870', '#5a4a3a', '#d8c0a0'],
+      ice: ['#c8d8e8', '#8aa0b8', '#ffffff'],
+      deep: ['#1a3a5a', '#000a1a', '#3a6a8a'],
+      miranda: ['#1a1a2a', '#4a3a4a', '#aaeedd'],
+      mars: ['#a05a3a', '#4a1a0a', '#e08a4a'],
+    };
+    const [top, bot, accent] = themes[theme] || themes.forest;
+    const g = c.createLinearGradient(0, 0, 0, 86);
+    g.addColorStop(0, top); g.addColorStop(1, bot);
+    c.fillStyle = g; c.fillRect(0, 0, 86, 86);
+    // Cliff
+    c.fillStyle = bot;
+    c.fillRect(0, 56, 86, 30);
+    // Waterfall
+    c.fillStyle = accent;
+    c.fillRect(32, 22, 22, 38);
+    // Highlight on water
+    c.fillStyle = 'rgba(255,255,255,0.4)';
+    c.fillRect(34, 24, 4, 34);
+  }
+
+  cinemaOverlay.addEventListener('click', () => {
+    if (state.cinemaStep === 0 && state.cinemaShowFall){
+      state.cinemaStep = 1;
+      showCinemaCard();
+    } else {
+      cinemaOverlay.style.display = 'none';
+      state.cinemaStep = 0;
+      startAiming();
+    }
+  });
+
+  function showQuickIntro(){
+    const p = currentPersona();
+    const f = currentFall();
+    const w = state.weather;
+    const weatherLine = w ? `<div style="font-size:10px; color:#4a3a2a; margin-top:6px; padding-top:6px; border-top:1px dashed #b8a070;"><b>${w.name}.</b> <span style="font-style:italic;">${w.desc}</span></div>` : '';
+    setOverlay(f.name,
+      `<div style="font-size:11px; letter-spacing:1.5px; color:#6a3a0a; margin-bottom:4px; font-variant:small-caps;">${f.height.toLocaleString()}m · Danger ${f.danger}×</div>
+       <div style="font-style:italic; margin-bottom:8px; font-size:12px;">${f.epitaph}</div>
+       <div style="font-size:10px; color:#6a5a3a; border-top:1px solid #b8a070; padding-top:6px; font-variant:small-caps; letter-spacing:0.5px;">${p.name} · ${p.quirk.name}</div>
+       ${weatherLine}`,
+      'Begin', startAiming);
+    state.phase = 'results';
+    overlay.style.display = 'flex';
+  }
+
+  // ===== SHOP/STORE =====
+  function renderShop(){
+    const base = BASE_STATS; const eff = effectiveStats(); const pStats = currentPersona().stats;
+    const labels = { hull:'Hull', padding:'Padding', aero:'Aerodynamics' };
+    const desc = { hull:'Survive damage. Gates dangerous falls.', padding:'Bigger stunt scores. Longer combo window.', aero:'Slower fall. Lateral wind control.' };
+    statBars.innerHTML = '<div style="font-size:11px; color:#5a4a3a; font-style:italic; margin-bottom:10px;">Upgrades are paid with <b>$ Cash</b> only — never Scrip.</div>' + Object.keys(base).map(k => {
+      const baseLvl = base[k]; const effLvl = eff[k]; const mod = pStats[k];
+      const pips = Array.from({length:STAT_MAX}, (_,i) => {
+        const filled = i < effLvl;
+        const color = filled && i >= baseLvl && mod > 0 ? '#2a6a3a' : filled ? '#3a2a1a' : '#d4c5a0';
+        return `<span style="width:14px; height:14px; background:${color}; border:1px solid #6a4828; display:inline-block; margin-right:2px; box-shadow: 0 1px 1px rgba(0,0,0,0.2) inset;"></span>`;
+      }).join('');
+      const cost = baseLvl < STAT_MAX ? STAT_COST[baseLvl] : null;
+      const canAfford = cost !== null && state.cash >= cost;
+      const btn = baseLvl >= STAT_MAX ? `<span style="font-size:10px; color:#2a6a3a; font-weight:700; font-variant:small-caps; letter-spacing:1px;">Max</span>` :
+        `<button class="ornate-btn" ${canAfford?`onclick="window.__upgrade('${k}')"`:'disabled style="opacity:0.5;"'}>Upgrade $${cost}</button>`;
+      const modText = mod !== 0 ? `<span style="color:${mod>0?'#2a6a3a':'#8a2020'}; font-size:10px;"> (${mod>0?'+':''}${mod})</span>` : '';
+      return `<div class="item-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div><span style="font-weight:700; font-size:13px;">${labels[k]}</span><span style="font-size:10px; color:#6a4828; margin-left:6px; font-variant:small-caps; letter-spacing:0.5px;">Lv ${effLvl}${modText}</span></div>
+          ${btn}
+        </div>
+        <div style="margin-bottom:6px;">${pips}</div>
+        <div style="font-size:10px; color:#5a4a3a; font-style:italic;">${desc[k]}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderStore(){
+    if (state.storeTab === 'earned'){
+      storeBody.innerHTML = `<div style="font-size:11px; color:#5a4a3a; font-style:italic; margin-bottom:10px;">Paid with <b style="color:#6a3a0a;">★ Prestige</b>. You have <b style="color:#6a3a0a;">★ ${state.prestige}</b>.</div>` + renderItemsBySource('prestige');
+    } else if (state.storeTab === 'premium'){
+      storeBody.innerHTML = `<div style="font-size:11px; color:#5a4a3a; font-style:italic; margin-bottom:10px;">Paid with <b style="color:#4a2a6a;">◈ Scrip</b>. You have <b style="color:#4a2a6a;">◈ ${state.scrip}</b>.</div>` + renderItemsBySource('scrip');
+    } else {
+      storeBody.innerHTML = `<div style="font-size:11px; color:#5a4a3a; font-style:italic; margin-bottom:10px;">Cosmetics only — never power, never speed.</div>` +
+        SCRIP_BUNDLES.map(b => `<div class="item-card" style="display:flex; justify-content:space-between; align-items:center;"><div><div style="font-weight:700; font-size:13px;">${b.name}</div><div style="font-size:11px; color:#4a2a6a; font-weight:700;">◈ ${b.amount}</div></div><button class="ornate-btn" onclick="window.__buyScrip('${b.id}')">${b.price}</button></div>`).join('');
+    }
+  }
+  function renderItemsBySource(source){
+    const grouped = {};
+    COSMETICS.filter(c => c.source === source).forEach(c => {
+      if (!grouped[c.category]) grouped[c.category] = [];
+      grouped[c.category].push(c);
+    });
+    const labels = { vessel_skin:'Vessel skins', splash_color:'Splash colors', pennant:'Pennants' };
+    const sym = source === 'prestige' ? '★' : '◈';
+    const colorClass = source === 'prestige' ? 'gold' : 'purple';
+    const bal = source === 'prestige' ? state.prestige : state.scrip;
+    return Object.keys(grouped).map(cat => `<div style="font-size:11px; color:#5a4a3a; font-variant:small-caps; letter-spacing:1px; margin:12px 0 4px; font-weight:700;">${labels[cat]||cat}</div>` +
+      grouped[cat].map(c => {
+        const equipped = state.equipped[c.category] === c.id;
+        let action;
+        if (c.owned){ action = equipped ? `<span style="font-size:10px; color:#2a6a3a; font-weight:700; font-variant:small-caps; letter-spacing:1px;">Equipped</span>` : `<button class="ornate-btn" onclick="window.__equip('${c.id}')">Equip</button>`; }
+        else { action = bal >= c.cost ? `<button class="ornate-btn ${colorClass}" onclick="window.__buyCosmetic('${c.id}')">${sym} ${c.cost}</button>` : `<span style="font-size:10px; color:#7a5a3a;">${sym} ${c.cost}</span>`; }
+        return `<div class="item-card" style="display:flex; justify-content:space-between; align-items:center;"><div><div style="font-size:12px; font-weight:700;">${c.name}</div><div style="font-size:10px; color:#5a4a3a; font-style:italic;">${c.desc}</div></div>${action}</div>`;
+      }).join('')).join('');
+  }
+
+  window.__upgrade = (k) => { const lvl = BASE_STATS[k]; const cost = STAT_COST[lvl]; if (state.cash >= cost && lvl < STAT_MAX){ state.cash -= cost; BASE_STATS[k] += 1; updateHud(); renderShop(); } };
+  window.__buyCosmetic = (id) => { const c = COSMETICS.find(x => x.id === id); if (!c) return; const cur = c.source === 'prestige' ? 'prestige' : 'scrip'; if (state[cur] >= c.cost){ state[cur] -= c.cost; c.owned = true; if (!state.equipped[c.category]) state.equipped[c.category] = c.id; updateHud(); renderStore(); flash('OWNED: '+c.name.toUpperCase(), c.source==='prestige'?'#6a3a0a':'#4a2a6a'); } };
+  window.__equip = (id) => { const c = COSMETICS.find(x => x.id === id); if (!c || !c.owned) return; state.equipped[c.category] = id; renderStore(); flash('EQUIPPED', '#2a6a3a'); };
+  window.__buyScrip = (bid) => { const b = SCRIP_BUNDLES.find(x => x.id === bid); state.scrip += b.amount; updateHud(); flash('+'+b.amount+' SCRIP', '#4a2a6a'); renderStore(); };
+  window.__heal = () => { const cost = (state.maxHp - state.hp) * 2; if (state.cash >= cost){ state.cash -= cost; state.hp = state.maxHp; state.recovering = false; updateHud(); state.phase = 'menu'; state.pickerStage = 'fall'; switchScreen('play'); } };
+  window.__rest = () => { state.hp = Math.min(state.maxHp, state.hp + 40); state.recovering = false; updateHud(); state.phase = 'menu'; state.pickerStage = 'fall'; switchScreen('play'); };
+
+  function startAiming(){
+    if (state.recovering){ showRecoveryCard(); return; }
+    const p = currentPersona();
+    if (p.id === 'soucek'){
+      if (state.cash < 200){ setOverlay('Press fees unpaid', 'Soucek requires $200 per run for press.', 'OK', () => { state.phase = 'menu'; switchScreen('play'); }); return; }
+      state.cash -= 200; updateHud(); flash('PR: -$200', '#8a6a2a');
+    }
+    // First-run: request tilt permission (we're inside a user-tap handler)
+    if (state.inputMode === 'tilt' && !state.tiltPermissionGranted && !state.tiltAsked){
+      state.tiltAsked = true;
+      requestTiltPermission();
+    }
+    state.phase = 'aiming'; state.aimPower = 0; state.holdStart = 0;
+    overlay.style.display = 'none';
+    state.pillowUsed = false;
+    initMechanic();
+    switchScreen('play');
+  }
+
+  function showRecoveryCard(){
+    const healCost = (state.maxHp - state.hp) * 2;
+    const canAfford = state.cash >= healCost;
+    setOverlay('Recovering',
+      `HP: ${state.hp}/${state.maxHp}.<br><br>` +
+      (canAfford ? `<button class="ornate-btn" style="margin:4px;" onclick="window.__heal()">Doctor — $${healCost}</button>` : `<span style="color:#7a5a3a; font-size:11px;">Doctor asks $${healCost}</span>`) +
+      `<br><button class="ornate-btn gold" style="margin:4px;" onclick="window.__rest()">Rest (+40 HP)</button>`,
+      'Workshop', () => switchScreen('shop'));
+    state.phase = 'results';
+    overlay.style.display = 'flex';
+  }
+
+  function initMechanic(){
+    const f = currentFall(); state.hazards = []; state.mechState = {};
+    state.bonuses = []; state.unconscious = false;
+    state.forkTriggered = false; state.forkChoice = null;
+    state.breathMeter = 1.0;
+    state.heatMeter = 0;
+    const scale = f.duration / 9;
+    // Bonus pickups — spawn across ALL falls for lateral-movement meaning
+    const bonusCount = Math.round(5 * scale + 3);
+    for (let i = 0; i < bonusCount; i++){
+      const progress = 0.12 + Math.random() * 0.82;
+      // Bias some bonuses toward edges (harder to reach)
+      const edgeBias = Math.random() < 0.4;
+      const x = edgeBias
+        ? (Math.random() < 0.5 ? 50 + Math.random() * 40 : W - 90 + Math.random() * 40)
+        : 70 + Math.random() * (W - 140);
+      // Most are small cash, some are prestige stars
+      const isPrestige = Math.random() < 0.15;
+      state.bonuses.push({
+        progress, x,
+        type: isPrestige ? 'prestige' : 'cash',
+        value: isPrestige ? 1 : Math.round(80 + Math.random() * 120),
+        collected: false,
+        bob: Math.random() * Math.PI * 2
+      });
+    }
+    switch (f.mechanic){
+      case 'wind': state.mechState.windT = 0; state.mechState.windDir = 1; break;
+      case 'ledges':
+        const numLedges = Math.max(3, Math.round(3 * scale));
+        state.mechState.ledges = Array.from({length: numLedges}, (_, i) => {
+          const y = (i + 1) / (numLedges + 1);
+          return { y, hit:false, windowStart:y-0.04, windowEnd:y+0.04 };
+        }); break;
+      case 'rocks':
+        const rockCount = Math.round(8 * scale);
+        for (let i=0; i<rockCount; i++) state.hazards.push({ progress:0.15+Math.random()*0.8, x:60+Math.random()*(W-120), size:16+Math.random()*12, type:'rocks' });
+        break;
+      case 'ice':
+        const iceCount = Math.round(14 * scale);
+        for (let i=0; i<iceCount; i++) state.hazards.push({ progress:0.15+Math.random()*0.8, x:60+Math.random()*(W-120), size:8+Math.random()*8, type:'ice' });
+        break;
+      case 'underwater': state.mechState.pressure = 1.0; break;
+      case 'volcano': state.mechState.nextPlume = 0.3; break;
+    }
+  }
+
+  function beginFall(){
+    const target = 0.75;
+    const acc = 1 - Math.min(1, Math.abs(state.aimPower - target) / target);
+    state.launchAccuracy = acc; state.phase = 'falling'; state.fallProgress = 0;
+    const aeroSlow = 1 - (effectiveStats().aero - 1) * 0.08;
+    const f = currentFall();
+    const baseSpeed = 1 / (f.duration * 60);
+    let speed = baseSpeed * (0.85 + state.aimPower * 0.3);
+    if (f.mechanic === 'underwater') speed *= 0.7;
+    if (f.mechanic === 'zerog') speed *= 0.85;
+    state.fallSpeed = speed * aeroSlow;
+    state.stuntScore = 0; state.comboCount = 0; state.comboTimer = 0;
+    state.crowdHype = currentPersona().id === 'leach' ? 0.2 : 0;
+    state.barrelX = W*0.5; state.barrelY = 80; state.barrelRot = 0; state.barrelVRot = 0.03; state.barrelVX = 0;
+    // Reset ability state
+    state.abilityReady = true;
+    state.abilityCooldown = 0;
+    state.abilityActive = false;
+    state.abilityTimer = 0;
+    shake(6, 0.4); spawnParticles(W*0.5, 85, 20, '#ffffff', 3);
+    if (acc > 0.9){ flash('PERFECT LAUNCH', '#2a8a4a'); shake(12, 0.5); }
+    else if (acc > 0.7){ flash('GOOD LAUNCH', '#3a6aaa'); }
+    else { flash('SLOPPY LAUNCH', '#aa3a3a'); }
+  }
+
+  function triggerStunt(kind){
+    const p = currentPersona();
+    const paddingMul = 1 + (effectiveStats().padding - 1) * 0.15;
+    let base = { spin:50, flip:90, corkscrew:150 }[kind] || 0;
+    const f = currentFall();
+    if (f.mechanic === 'deeplong') base *= (1 + state.fallProgress * 1.5);
+    if (f.mechanic === 'zerog') base *= 1.4;
+    if (p.id === 'leach') base *= 1.25;
+    if (p.id === 'lussier') base *= 0.9;
+    // Showboat ability: 2× stunts while active
+    if (state.abilityActive && p.ability.id === 'showboat') base *= 2;
+    // Weather: rain makes stunts slippery and reduces scoring
+    if (state.weather && state.weather.id === 'rain') base *= 0.9;
+    const comboMul = 1 + state.comboCount * 0.25;
+    const pts = Math.round(base * comboMul * paddingMul);
+    state.stuntScore += pts; state.comboCount += 1;
+    state.comboTimer = 1.2 + (effectiveStats().padding - 1) * 0.15;
+    // Weather: ceremony (press day) builds hype faster
+    const hypeGain = (state.weather && state.weather.id === 'ceremony') ? 0.26 : 0.18;
+    state.crowdHype = Math.min(1, state.crowdHype + hypeGain);
+    if (kind === 'spin'){ state.barrelVRot = 0.35; spawnParticles(state.barrelX, state.barrelY, 8, '#fef3c7', 2.5); }
+    else if (kind === 'flip'){ state.barrelVRot = 0.55; spawnParticles(state.barrelX, state.barrelY, 14, '#fbbf24', 3); shake(4,0.2); }
+    else if (kind === 'corkscrew'){ state.barrelVRot = 0.8; spawnParticles(state.barrelX, state.barrelY, 24, '#f97316', 4); shake(8,0.35); }
+    const label = kind.toUpperCase()+' +'+pts+(state.comboCount>1?'  ×'+state.comboCount:'');
+    flash(label, kind==='corkscrew'?'#f97316':kind==='flip'?'#fbbf24':'#fde047');
+    if (navigator.vibrate){ navigator.vibrate(kind==='corkscrew'?[30,20,30]:kind==='flip'?20:10); }
+  }
+
+  function updateMechanic(){
+    const f = currentFall(); const dt = 1/60; const p = currentPersona();
+
+    // ===== LATERAL MOVEMENT — applies to all falls =====
+    // Tilt input if available, touch-edge fallback otherwise
+    let lateralSignal = 0;
+    if (state.inputMode === 'tilt' && state.tiltPermissionGranted){
+      lateralSignal = state.tiltX;
+    } else {
+      lateralSignal = state.touchLateralDir;
+    }
+    // Weather: high wind amplifies lateral forces and adds drift
+    if (state.weather && state.weather.id === 'wind'){
+      state.barrelVX += (Math.sin(performance.now() * 0.001) * 0.4) * dt * 4;
+    }
+    const aeroControl = 1 + (effectiveStats().aero - 1) * 0.15;
+    const playerForce = lateralSignal * 1.4 * aeroControl;
+    state.barrelVX += playerForce;
+    state.barrelVX *= 0.88; // damping
+    state.barrelX += state.barrelVX;
+    state.barrelX = Math.max(35, Math.min(W - 35, state.barrelX));
+
+    // ===== BONUS PICKUP COLLISION =====
+    for (const b of state.bonuses){
+      if (b.collected) continue;
+      const by = 80 + b.progress * (H - 140);
+      if (Math.abs(state.barrelX - b.x) < 26 && Math.abs(state.barrelY - by) < 26){
+        b.collected = true;
+        if (b.type === 'cash'){
+          state.stuntScore += b.value;
+          flash('+$' + b.value, '#2a8a4a');
+          spawnParticles(b.x, by, 10, '#d4a848', 3);
+        } else {
+          state.prestige += b.value;
+          flash('★ +' + b.value + ' PRESTIGE', '#8a5a1a');
+          spawnParticles(b.x, by, 16, '#f0c850', 3.5);
+          updateHud();
+        }
+        state.crowdHype = Math.min(1, state.crowdHype + 0.06);
+        if (navigator.vibrate) navigator.vibrate(15);
+      }
+    }
+
+    // ===== FALL-SPECIFIC MECHANICS =====
+    if (f.mechanic === 'wind'){
+      state.mechState.windT -= dt;
+      if (state.mechState.windT <= 0){ state.mechState.windDir = Math.random()>0.5?1:-1; state.mechState.windT = 1.2+Math.random()*0.8; flash('WIND '+(state.mechState.windDir>0?'→':'←'), '#a0a0a0'); }
+      const windForce = 0.7 * state.mechState.windDir;
+      const aeroResist = 1 - (effectiveStats().aero-1)*0.15;
+      state.barrelVX += windForce*aeroResist*dt*3;
+    }
+    if (f.mechanic === 'ledges'){
+      for (const l of state.mechState.ledges){
+        if (!l.hit && state.fallProgress>=l.windowStart && state.fallProgress<=l.windowEnd){
+          const dist = Math.abs(state.fallProgress-l.y);
+          if (dist<0.02 && Math.abs(state.barrelX-W/2)<50){ l.hit=true; state.stuntScore+=200; state.crowdHype=Math.min(1,state.crowdHype+0.2); flash('LEDGE! +$200','#2a8a4a'); shake(6,0.3); spawnParticles(state.barrelX,state.barrelY,20,'#ffffff',3); }
+        } else if (!l.hit && state.fallProgress>l.windowEnd){ l.hit=true; flash('MISSED LEDGE','#aa3a3a'); }
+      }
+    }
+    if (f.mechanic === 'rocks' || f.mechanic === 'ice'){
+      for (const h of state.hazards){
+        if (h.hit) continue;
+        const hy = 80+h.progress*(H-140);
+        if (Math.abs(state.barrelX-h.x)<20+h.size/2 && Math.abs(state.barrelY-hy)<20+h.size/2){
+          h.hit = true;
+          // Steady ability: ignore hazard damage entirely
+          if (state.abilityActive && p.ability.id === 'steady'){
+            flash('BRACED', '#3a6aaa');
+            spawnParticles(h.x, hy, 10, '#a0c8f0', 3);
+            continue;
+          }
+          // Overinflate: repel next hazard, consume the ability
+          if (state.abilityActive && p.ability.id === 'bounce'){
+            state.abilityActive = false;
+            state.abilityTimer = 0;
+            flash('REPELLED!', '#8a5a1a');
+            spawnParticles(h.x, hy, 20, '#d4a848', 5);
+            shake(5, 0.2);
+            state.stuntScore += 50;
+            continue;
+          }
+          let dmg = f.mechanic==='ice'?6:16;
+          if (p.id === 'lussier') dmg *= 0.5;
+          // Fog weather: hazards hit harder because they appear late
+          if (state.weather && state.weather.id === 'fog') dmg *= 1.3;
+          // Showboat: +50% incoming damage
+          if (state.abilityActive && p.ability.id === 'showboat') dmg *= 1.5;
+          const hullMit = 1 - (effectiveStats().hull-1)*0.12;
+          const actualDmg = Math.round(dmg*hullMit);
+          state.hp = Math.max(0, state.hp-actualDmg);
+          flash('HIT! -'+actualDmg+' HP','#aa3a3a'); shake(10,0.3);
+          spawnParticles(h.x,hy,15,f.mechanic==='ice'?'#d0e8f0':'#a08050',4);
+          state.comboCount = Math.max(0,state.comboCount-1); updateHud();
+          // Check for unconscious state
+          if (state.hp <= 0){ triggerUnconscious(); return; }
+        }
+      }
+    }
+    if (f.mechanic === 'underwater'){
+      // Breath meter — drains over time, replenished by air pockets (spawned via bonuses system)
+      state.breathMeter = Math.max(0, state.breathMeter - dt * 0.055);
+      if (state.breathMeter <= 0){
+        // Out of air — damage tick
+        state.mechState.suffocateTimer = (state.mechState.suffocateTimer || 0) + dt;
+        if (state.mechState.suffocateTimer >= 1){
+          state.mechState.suffocateTimer = 0;
+          const hullMit = 1 - (effectiveStats().hull-1) * 0.15;
+          const dmg = Math.round(10 * hullMit);
+          state.hp = Math.max(0, state.hp - dmg);
+          flash('NO AIR -' + dmg + ' HP', '#5a3aaa');
+          shake(6, 0.3);
+          updateHud();
+          if (state.hp <= 0){ triggerUnconscious(); return; }
+        }
+      }
+      // Periodic air pocket spawns (visible, give +30% breath)
+      state.mechState.nextAir = (state.mechState.nextAir || 2) - dt;
+      if (state.mechState.nextAir <= 0){
+        state.mechState.nextAir = 2 + Math.random() * 1.5;
+        // Spawn an air pocket as a special pickup-like object
+        state.mechState.airPockets = state.mechState.airPockets || [];
+        const ax = 60 + Math.random() * (W - 120);
+        state.mechState.airPockets.push({
+          x: ax,
+          progress: state.fallProgress + 0.15 + Math.random() * 0.1,
+          collected: false,
+          bob: Math.random() * Math.PI * 2
+        });
+      }
+      // Check air pocket collision
+      if (state.mechState.airPockets){
+        for (const a of state.mechState.airPockets){
+          if (a.collected) continue;
+          const ay = 80 + a.progress * (H - 140);
+          if (Math.abs(state.barrelX - a.x) < 26 && Math.abs(state.barrelY - ay) < 26){
+            a.collected = true;
+            state.breathMeter = Math.min(1, state.breathMeter + 0.35);
+            flash('+AIR', '#6ad0e0');
+            spawnParticles(a.x, ay, 16, '#d0f0ff', 3);
+            if (navigator.vibrate) navigator.vibrate(12);
+          }
+        }
+      }
+    }
+    if (f.mechanic === 'volcano'){
+      // Heat meter — builds over time, plumes cool you
+      state.heatMeter = Math.min(1, state.heatMeter + dt * 0.04);
+      if (state.heatMeter >= 1){
+        // Overheat damage tick
+        state.mechState.heatTimer = (state.mechState.heatTimer || 0) + dt;
+        if (state.mechState.heatTimer >= 0.8){
+          state.mechState.heatTimer = 0;
+          const hullMit = 1 - (effectiveStats().hull-1) * 0.15;
+          const dmg = Math.round(12 * hullMit);
+          state.hp = Math.max(0, state.hp - dmg);
+          flash('OVERHEATING -' + dmg + ' HP', '#ea4a1a');
+          shake(8, 0.3);
+          updateHud();
+          if (state.hp <= 0){ triggerUnconscious(); return; }
+        }
+      }
+      state.mechState.nextPlume -= dt;
+      if (state.mechState.nextPlume <= 0){
+        state.mechState.nextPlume = 0.6+Math.random()*0.6;
+        const plumeX = 80+Math.random()*(W-160);
+        if (Math.abs(state.barrelX-plumeX)<60){
+          state.stuntScore += 150; state.crowdHype = Math.min(1,state.crowdHype+0.25);
+          flash('PLUME RIDE +$150','#ea6a2a'); state.fallSpeed *= 0.85;
+          state.heatMeter = Math.max(0, state.heatMeter - 0.4); // plume cools!
+          spawnParticles(plumeX,state.barrelY+40,30,'#ff6a1a',5); shake(8,0.4);
+        } else { spawnParticles(plumeX,H-100,20,'#ff4a0a',4); }
+      }
+    }
+    // Thrust ability: slow fall dramatically while active
+    if (state.abilityActive && p.ability.id === 'thrust'){
+      // Reapply slow each frame (since fallSpeed isn't reset between frames it would stack)
+      state.mechState.thrustOriginalSpeed = state.mechState.thrustOriginalSpeed || state.fallSpeed;
+      state.fallSpeed = state.mechState.thrustOriginalSpeed * 0.35;
+    } else if (state.mechState.thrustOriginalSpeed){
+      state.fallSpeed = state.mechState.thrustOriginalSpeed;
+      delete state.mechState.thrustOriginalSpeed;
+    }
+  }
+
+  // Mid-run HP=0: player is unconscious, run ends early with major cash penalty
+  function triggerUnconscious(){
+    if (state.unconscious) return;
+    state.unconscious = true;
+    state.phase = 'splashing';
+    state.splashT = 0;
+    shake(24, 1.2);
+    spawnParticles(state.barrelX, state.barrelY, 50, '#6a2020', 8);
+    flash('UNCONSCIOUS — YOU LOSE HALF THE PURSE', '#8a2020');
+    if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
+    // Prepare result: halved earnings, no prestige, forced recovery
+    const fall = currentFall(); const p = currentPersona();
+    const accBonus = Math.round(state.launchAccuracy * 200);
+    const stuntBonus = Math.round(state.stuntScore * 0.5);
+    const total = Math.round((accBonus + stuntBonus) * fall.danger * 0.4);
+    state.cash += total; state.totalEarned += total;
+    state.recovering = true;
+    state.runResult = {
+      accBonus, stuntBonus, dangerMul: fall.danger.toFixed(1), hypeMul:'0.00',
+      total, combo: state.comboCount,
+      splashGrade: 'UNCONSCIOUS', splashMul: '0.5',
+      hpDmg: 0, persona: p.name,
+      prestigeGained: 0, prestigeReasons: [],
+      unconscious: true
+    };
+    updateHud();
+  }
+
+  function endRun(){
+    const fall = currentFall(); const p = currentPersona();
+    const accBonus = Math.round(state.launchAccuracy*200);
+    const stuntBonus = state.stuntScore;
+    // Danger multiplier incorporates weather danger modifier
+    const weatherDangerMod = state.weather ? state.weather.dangerMod : 0;
+    const weatherRewardMod = state.weather ? state.weather.rewardMod : 0;
+    const dangerMul = fall.danger + weatherDangerMod;
+    let hypeMul = 1 + state.crowdHype*0.5;
+    if (p.id === 'soucek') hypeMul = 1 + state.crowdHype*0.75;
+    const rotMod = ((state.barrelRot%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
+    const fromUpright = Math.min(rotMod, Math.PI*2-rotMod);
+    // HARSHER LANDING PENALTIES (v8):
+    let splashGrade, splashMul, hpDmg;
+    if (fromUpright<0.3){ splashGrade='PERFECT'; splashMul=1.5; hpDmg=0; }
+    else if (fromUpright<0.9){ splashGrade='Clean'; splashMul=1.1; hpDmg=4; }
+    else if (fromUpright<Math.PI-0.6){ splashGrade='Messy'; splashMul=0.5; hpDmg=22; }
+    else { splashGrade='DISASTER'; splashMul=0.15; hpDmg=50; }
+    if (p.id==='taylor' && splashGrade==='DISASTER' && !state.pillowUsed){ splashGrade='Messy (Pillow!)'; splashMul=0.5; hpDmg=22; state.pillowUsed=true; }
+    if (p.id==='leach' && (splashGrade.startsWith('Messy')||splashGrade==='DISASTER')) hpDmg *= 2;
+    const hullMit = 1-(effectiveStats().hull-1)*0.15;
+    const actualHpDmg = Math.max(0, Math.round(hpDmg*hullMit*(0.6 + fall.danger*0.4)));
+    state.hp = Math.max(0, state.hp-actualHpDmg);
+    // Apply weather reward modifier
+    const rewardMultiplier = 1 + weatherRewardMod;
+    const total = Math.round((accBonus+stuntBonus)*dangerMul*hypeMul*splashMul*rewardMultiplier);
+    state.cash += total; state.totalEarned += total;
+    if (state.comboCount >= 3) state.rep += 1;
+    let prestigeGained = 0; const prestigeReasons = [];
+    if (splashGrade === 'PERFECT'){ prestigeGained += 3; prestigeReasons.push('Perfect: +3'); }
+    if (state.crowdHype >= 0.95){ prestigeGained += 2; prestigeReasons.push('Frenzy: +2'); }
+    if (state.comboCount >= 5){ prestigeGained += 2; prestigeReasons.push('5+ combo: +2'); }
+    if (!state.fallsCleared.has(fall.id)){ prestigeGained += 5; prestigeReasons.push('First clear: +5'); }
+    state.prestige += prestigeGained;
+    state.fallsCleared.add(fall.id); state.tiersCleared.add(fall.tier);
+    // Track persona mastery
+    state.personaMastery[p.id] = (state.personaMastery[p.id] || 0) + 1;
+    if (state.hp < 30) state.recovering = true;
+    state.runResult = { accBonus, stuntBonus, dangerMul:dangerMul.toFixed(1), hypeMul:hypeMul.toFixed(2), total, combo:state.comboCount, splashGrade, splashMul:splashMul.toFixed(2), hpDmg:actualHpDmg, persona:p.name, prestigeGained, prestigeReasons, weather: state.weather, weatherReward: weatherRewardMod };
+    state.phase = 'splashing'; state.splashT = 0;
+    shake(18,0.8);
+    spawnParticles(state.barrelX, H-50, 40, getSplashColor(), 6);
+    spawnParticles(state.barrelX, H-50, 20, '#a8d4f0', 5);
+    flash('SPLASHDOWN — '+splashGrade, splashMul>1?'#2a8a4a':splashMul>0.9?'#3a6aaa':'#aa3a3a');
+    if (navigator.vibrate) navigator.vibrate(50);
+    updateHud();
+    PERSONAS.forEach(p => {
+      if (p.unlocked) return;
+      let unlock = false;
+      if (p.unlockReq.type==='fall' && state.fallsCleared.has(p.unlockReq.id)) unlock = true;
+      if (p.unlockReq.type==='tier' && state.tiersCleared.has(p.unlockReq.val)) unlock = true;
+      if (unlock){ p.unlocked = true; setTimeout(()=>flash('UNLOCKED: '+p.name.toUpperCase(),'#a855f7'),500); }
+    });
+  }
+
+  function getSplashColor(){
+    const sid = state.equipped.splash_color;
+    if (!sid) return '#ffffff';
+    switch(sid){ case 'splash_aqua': return '#6ad0e0'; case 'splash_gold': return '#f0c850'; case 'splash_violet': return '#a070d0'; }
+    return '#ffffff';
+  }
+
+  function showResults(){
+    const r = state.runResult;
+    if (r.unconscious){
+      const body = `
+        <div style="text-align:left; font-size:12px; line-height:1.7; font-family:'Iowan Old Style',Georgia,serif;">
+          <div style="font-size:10px; color:#8a2020; font-style:italic; margin-bottom:8px; font-variant:small-caps; letter-spacing:0.5px; text-align:center; font-weight:700;">— ${r.persona} lost consciousness —</div>
+          <div style="font-size:11px; color:#5a4a3a; margin-bottom:10px; text-align:center; font-style:italic;">Fished out. Halved purse. Recovery required.</div>
+          <div style="display:flex; justify-content:space-between;"><span>Partial earnings</span><span>+$${r.total}</span></div>
+          <div style="display:flex; justify-content:space-between; color:#8a2020;"><span>Prestige forfeit</span><span>—</span></div>
+        </div>
+      `;
+      setOverlay('UNCONSCIOUS', body, 'To Recovery', () => {
+        state.phase = 'menu';
+        showRecoveryCard();
+      });
+      return;
+    }
+    const prestigeLine = r.prestigeGained > 0 ? `<div style="display:flex; justify-content:space-between; color:#6a3a0a;"><span>Prestige</span><span>+★ ${r.prestigeGained}</span></div>` : '';
+    const prestigeDetail = r.prestigeReasons.length ? `<div style="font-size:10px; color:#5a4a3a; font-style:italic; margin-top:2px;">${r.prestigeReasons.join(' · ')}</div>` : '';
+    const weatherLine = (r.weather && r.weather.id !== 'clear') ? `<div style="display:flex; justify-content:space-between; color:#4a3a2a;"><span>${r.weather.name}</span><span>${r.weatherReward>0?'+':''}${Math.round(r.weatherReward*100)}%</span></div>` : '';
+    const body = `
+      <div style="text-align:left; font-size:12px; line-height:1.7; font-family:'Iowan Old Style',Georgia,serif;">
+        <div style="font-size:10px; color:#5a4a3a; font-style:italic; margin-bottom:4px; font-variant:small-caps; letter-spacing:0.5px;">${r.persona}</div>
+        <div style="display:flex; justify-content:space-between;"><span>Launch</span><span>+$${r.accBonus}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>Stunts (${r.combo} combo)</span><span>+$${r.stuntBonus}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>Danger</span><span>×${r.dangerMul}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>Hype</span><span>×${r.hypeMul}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>${r.splashGrade}</span><span>×${r.splashMul}</span></div>
+        ${weatherLine}
+        ${r.hpDmg>0?`<div style="display:flex; justify-content:space-between; color:#8a2020;"><span>Injury</span><span>-${r.hpDmg} HP</span></div>`:''}
+        <div style="display:flex; justify-content:space-between; border-top:1px solid #b8a070; margin-top:8px; padding-top:6px; font-weight:700;"><span>Cash</span><span>+$${r.total}</span></div>
+        ${prestigeLine}${prestigeDetail}
+      </div>
+    `;
+    setOverlay('Splashdown', body, 'Continue', () => {
+      state.phase = 'menu';
+      if (state.recovering){ showRecoveryCard(); }
+      else {
+        state.pickerStage = 'fall';
+        switchScreen('play');
+      }
+    });
+  }
+
+  // ===== OPENING SEQUENCE =====
+  // 5-beat cinematic opening, ~16s total, skippable on tap.
+
+  let openingCanvas = null, openingCtx = null;
+  let openingState = null;
+  const SEEN_OPENING_KEY = 'otf_seen_opening_v1';
+
+  function createOpeningOverlay(){
+    const overlay = document.createElement('div');
+    overlay.id = 'opening-overlay';
+    overlay.style.cssText = `
+      position: absolute; inset: 0;
+      background: #000;
+      z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      animation: fadein 0.8s ease-in;
+    `;
+
+    openingCanvas = document.createElement('canvas');
+    openingCanvas.style.cssText = 'width: 100%; height: 100%; display: block;';
+    overlay.appendChild(openingCanvas);
+
+    const skipHint = document.createElement('div');
+    skipHint.id = 'opening-skip-hint';
+    skipHint.style.cssText = `
+      position: absolute;
+      bottom: 16px; right: 16px;
+      font-size: 9px;
+      color: rgba(212, 168, 72, 0.5);
+      letter-spacing: 2px;
+      font-variant: small-caps;
+      font-family: 'Iowan Old Style', Georgia, serif;
+      pointer-events: none;
+    `;
+    skipHint.textContent = 'tap to skip';
+    overlay.appendChild(skipHint);
+
+    shakeWrap.appendChild(overlay);
+
+    openingCtx = openingCanvas.getContext('2d');
+    resizeOpeningCanvas();
+    overlay.addEventListener('click', skipOpening);
+
+    return overlay;
+  }
+
+  function resizeOpeningCanvas(){
+    if (!openingCanvas) return;
+    const rect = openingCanvas.getBoundingClientRect();
+    if (rect.width === 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    openingCanvas.width = Math.round(rect.width * dpr);
+    openingCanvas.height = Math.round(rect.height * dpr);
+    openingCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    openingState.W = rect.width;
+    openingState.H = rect.height;
+  }
+
+  function startOpening(){
+    let seen = false;
+    try { seen = localStorage.getItem(SEEN_OPENING_KEY) === '1'; } catch(e){}
+    if (seen){
+      // Skip directly to picker
+      switchScreen('play');
+      return;
+    }
+    openingState = {
+      startTime: performance.now(),
+      W: 420, H: 540,
+      finished: false,
+      skipped: false,
+    };
+    createOpeningOverlay();
+    requestAnimationFrame(openingTick);
+  }
+
+  function skipOpening(){
+    if (!openingState) return;
+    const now = performance.now();
+    const elapsed = (now - openingState.startTime) / 1000;
+    if (elapsed < 12){
+      // Jump to the title beat
+      openingState.startTime = now - 12000;
+    } else {
+      // Already at title — proceed
+      finishOpening();
+    }
+  }
+
+  function finishOpening(){
+    if (openingState.finished) return;
+    openingState.finished = true;
+    try { localStorage.setItem(SEEN_OPENING_KEY, '1'); } catch(e){}
+    const overlay = document.getElementById('opening-overlay');
+    if (overlay){
+      overlay.style.transition = 'opacity 0.6s ease-out';
+      overlay.style.opacity = '0';
+      setTimeout(() => {
+        overlay.remove();
+        switchScreen('play');
+      }, 600);
+    } else {
+      switchScreen('play');
+    }
+  }
+
+  function openingTick(){
+    if (!openingState || openingState.finished) return;
+    const t = (performance.now() - openingState.startTime) / 1000;
+    const W = openingState.W, H = openingState.H;
+    const c = openingCtx;
+
+    // Clear with deep black
+    c.fillStyle = '#000';
+    c.fillRect(0, 0, W, H);
+
+    // ===== BEAT 1 (0.0 - 2.5s): Ember awakens =====
+    if (t < 2.5){
+      const p = t / 2.5;
+      const eased = p * p * (3 - 2 * p); // smoothstep
+      const radius = 8 + eased * 60;
+      const intensity = 0.3 + eased * 0.7;
+      const cx = W/2, cy = H/2;
+      // Outer glow
+      const g1 = c.createRadialGradient(cx, cy, 0, cx, cy, radius * 4);
+      g1.addColorStop(0, `rgba(255, 140, 50, ${intensity * 0.4})`);
+      g1.addColorStop(0.4, `rgba(180, 80, 30, ${intensity * 0.2})`);
+      g1.addColorStop(1, 'rgba(60, 20, 5, 0)');
+      c.fillStyle = g1; c.fillRect(0, 0, W, H);
+      // Core
+      const g2 = c.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      g2.addColorStop(0, `rgba(255, 230, 180, ${intensity})`);
+      g2.addColorStop(0.5, `rgba(255, 160, 60, ${intensity * 0.8})`);
+      g2.addColorStop(1, 'rgba(180, 80, 20, 0)');
+      c.fillStyle = g2;
+      c.beginPath(); c.arc(cx, cy, radius, 0, Math.PI*2); c.fill();
+    }
+    // ===== BEAT 2 (2.5 - 5.5s): Establishing landscape =====
+    else if (t < 5.5){
+      const p = (t - 2.5) / 3.0;
+      const eased = Math.min(1, p * 1.4);
+      // Sky gradient fades in
+      const g = c.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, `rgba(80, 40, 20, ${eased})`);
+      g.addColorStop(0.4, `rgba(180, 100, 50, ${eased * 0.9})`);
+      g.addColorStop(0.7, `rgba(220, 150, 80, ${eased})`);
+      g.addColorStop(1, `rgba(60, 30, 15, ${eased})`);
+      c.fillStyle = g; c.fillRect(0, 0, W, H);
+      // Sun (the ember has become the sun)
+      const sx = W * 0.7, sy = H * 0.35;
+      const sg = c.createRadialGradient(sx, sy, 0, sx, sy, 60);
+      sg.addColorStop(0, `rgba(255, 220, 160, ${eased * 0.95})`);
+      sg.addColorStop(0.4, `rgba(255, 160, 70, ${eased * 0.6})`);
+      sg.addColorStop(1, 'rgba(180, 80, 20, 0)');
+      c.fillStyle = sg; c.fillRect(0, 0, W, H);
+      c.fillStyle = `rgba(255, 230, 180, ${eased})`;
+      c.beginPath(); c.arc(sx, sy, 22, 0, Math.PI*2); c.fill();
+      // Distant cliff silhouette — appears around p=0.3
+      if (p > 0.3){
+        const cliffOpacity = Math.min(1, (p - 0.3) / 0.4);
+        c.fillStyle = `rgba(30, 15, 8, ${cliffOpacity * 0.95})`;
+        c.beginPath();
+        c.moveTo(0, H * 0.6);
+        c.lineTo(W * 0.2, H * 0.55);
+        c.lineTo(W * 0.5, H * 0.5);
+        c.lineTo(W * 0.5, H);
+        c.lineTo(0, H);
+        c.closePath(); c.fill();
+        c.beginPath();
+        c.moveTo(W, H * 0.55);
+        c.lineTo(W * 0.7, H * 0.6);
+        c.lineTo(W * 0.55, H * 0.65);
+        c.lineTo(W * 0.55, H);
+        c.lineTo(W, H);
+        c.closePath(); c.fill();
+        // Painted cloud strokes
+        c.fillStyle = `rgba(220, 170, 110, ${cliffOpacity * 0.5})`;
+        c.beginPath(); c.ellipse(W*0.2, H*0.25, 50, 8, 0, 0, Math.PI*2); c.fill();
+        c.beginPath(); c.ellipse(W*0.85, H*0.32, 60, 9, 0, 0, Math.PI*2); c.fill();
+      }
+      // The barrel at the cliff edge — appears around p=0.6
+      if (p > 0.6){
+        const barrelOpacity = Math.min(1, (p - 0.6) / 0.3);
+        c.globalAlpha = barrelOpacity;
+        const bx = W * 0.5, by = H * 0.5 - 6;
+        c.save(); c.translate(bx, by); c.scale(0.55, 0.55);
+        drawOpeningBarrel(c);
+        c.restore();
+        c.globalAlpha = 1;
+      }
+      // Mist
+      c.fillStyle = `rgba(220, 200, 170, ${eased * 0.3})`;
+      c.beginPath(); c.ellipse(W*0.5, H*0.78, 80, 12, 0, 0, Math.PI*2); c.fill();
+    }
+    // ===== BEAT 3 (5.5 - 9.0s): The launch =====
+    else if (t < 9.0){
+      const p = (t - 5.5) / 3.5;
+      // Sky stays but cliff scrolls up rapidly (camera follows barrel down)
+      const g = c.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, '#3a1a0a');
+      g.addColorStop(0.4, '#7a3a1a');
+      g.addColorStop(0.7, '#a05a2a');
+      g.addColorStop(1, '#1a0a05');
+      c.fillStyle = g; c.fillRect(0, 0, W, H);
+      // Cliff face scrolling upward — the rocky wall we're falling past
+      const scrollY = p * H * 2.5;
+      c.fillStyle = '#1a0a05';
+      // Vertical rock striations
+      for (let stripe = 0; stripe < 30; stripe++){
+        const y = (stripe * 30 - scrollY) % (H + 60) - 30;
+        const x = (stripe % 3) * (W * 0.15);
+        c.fillStyle = `rgba(40, 20, 10, ${0.6 + (stripe % 2) * 0.2})`;
+        c.fillRect(x, y, W * 0.4, 22);
+        c.fillStyle = `rgba(60, 30, 15, 0.4)`;
+        c.fillRect(W - x - W * 0.4, y + 12, W * 0.4, 18);
+      }
+      // Falling water alongside, motion-blurred white streaks
+      c.fillStyle = 'rgba(244, 230, 200, 0.4)';
+      for (let i = 0; i < 8; i++){
+        const wx = 30 + i * (W / 8);
+        const stripeOffset = (p * 1500 + i * 200) % H;
+        const sy = (stripeOffset) % H;
+        c.fillRect(wx, sy, 4, 60);
+      }
+      // The barrel — center, rotating, slight bob
+      const bx = W * 0.5 + Math.sin(p * 8) * 12;
+      const by = H * 0.42;
+      const rot = p * Math.PI * 4; // multiple rotations
+      c.save(); c.translate(bx, by); c.rotate(rot); c.scale(1, 1);
+      drawOpeningBarrel(c);
+      c.restore();
+      // Particles streaming up past the barrel (suggesting downward motion)
+      c.fillStyle = 'rgba(255, 240, 200, 0.6)';
+      for (let i = 0; i < 25; i++){
+        const px = (i * 37 + Math.sin(t * 4 + i)) % W;
+        const py = (i * 41 - p * 1200) % (H + 100) - 50;
+        if (py > 0 && py < H){
+          c.fillRect(px, py, 2, 8);
+        }
+      }
+      // Vignette intensifies
+      const v = c.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.7);
+      v.addColorStop(0, 'rgba(0,0,0,0)');
+      v.addColorStop(1, `rgba(0,0,0,${0.4 + p * 0.3})`);
+      c.fillStyle = v; c.fillRect(0, 0, W, H);
+    }
+    // ===== BEAT 4 (9.0 - 12.0s): Splash and title =====
+    else if (t < 12.0){
+      const p = (t - 9.0) / 3.0;
+      // Splash flash at start
+      if (p < 0.3){
+        const flashAlpha = (1 - p / 0.3);
+        c.fillStyle = `rgba(255, 250, 230, ${flashAlpha})`;
+        c.fillRect(0, 0, W, H);
+      }
+      // Painted backdrop (a frozen Niagara-like still life)
+      const g = c.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, '#3a2010');
+      g.addColorStop(0.5, '#6a3818');
+      g.addColorStop(1, '#1a0a05');
+      c.fillStyle = g; c.fillRect(0, 0, W, H);
+      // Ornamental frame
+      const fadeIn = Math.min(1, (p - 0.2) / 0.5);
+      c.globalAlpha = fadeIn;
+      // Title
+      c.fillStyle = '#f4ecd8';
+      c.font = '700 38px Georgia,serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      // Title shadow
+      c.fillStyle = 'rgba(0,0,0,0.5)';
+      c.fillText('OVER THE FALLS', W/2 + 2, H * 0.42 + 2);
+      c.fillStyle = '#f4ecd8';
+      c.fillText('OVER THE FALLS', W/2, H * 0.42);
+      // Decorative line above and below
+      c.strokeStyle = '#d4a848';
+      c.lineWidth = 1;
+      const lineY1 = H * 0.42 - 30;
+      const lineY2 = H * 0.42 + 30;
+      const lineW = 140;
+      c.beginPath(); c.moveTo(W/2 - lineW/2, lineY1); c.lineTo(W/2 + lineW/2, lineY1); c.stroke();
+      c.beginPath(); c.moveTo(W/2 - lineW/2, lineY2); c.lineTo(W/2 + lineW/2, lineY2); c.stroke();
+      // Diamond ornaments on lines
+      c.fillStyle = '#d4a848';
+      [lineY1, lineY2].forEach(ly => {
+        [-lineW/2, lineW/2].forEach(off => {
+          c.beginPath();
+          c.moveTo(W/2 + off, ly - 3); c.lineTo(W/2 + off + 3, ly);
+          c.lineTo(W/2 + off, ly + 3); c.lineTo(W/2 + off - 3, ly);
+          c.closePath(); c.fill();
+        });
+      });
+      // Subtitle
+      const subFade = Math.min(1, (p - 0.5) / 0.4);
+      c.globalAlpha = fadeIn * subFade;
+      c.fillStyle = '#d4b890';
+      c.font = 'italic 14px Georgia,serif';
+      c.fillText('A daredevil\'s ledger', W/2, H * 0.42 + 50);
+      c.font = '600 11px Georgia,serif';
+      c.fillStyle = '#a08868';
+      c.fillText('1899', W/2, H * 0.42 + 70);
+      c.globalAlpha = 1;
+    }
+    // ===== BEAT 5 (12.0+): Hold + tap to begin =====
+    else {
+      const p = t - 12.0;
+      // Static title
+      const g = c.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, '#3a2010');
+      g.addColorStop(0.5, '#6a3818');
+      g.addColorStop(1, '#1a0a05');
+      c.fillStyle = g; c.fillRect(0, 0, W, H);
+      // Title
+      c.fillStyle = 'rgba(0,0,0,0.5)';
+      c.font = '700 38px Georgia,serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText('OVER THE FALLS', W/2 + 2, H * 0.42 + 2);
+      c.fillStyle = '#f4ecd8';
+      c.fillText('OVER THE FALLS', W/2, H * 0.42);
+      // Decorative lines
+      c.strokeStyle = '#d4a848'; c.lineWidth = 1;
+      const lineY1 = H * 0.42 - 30, lineY2 = H * 0.42 + 30, lineW = 140;
+      c.beginPath(); c.moveTo(W/2 - lineW/2, lineY1); c.lineTo(W/2 + lineW/2, lineY1); c.stroke();
+      c.beginPath(); c.moveTo(W/2 - lineW/2, lineY2); c.lineTo(W/2 + lineW/2, lineY2); c.stroke();
+      c.fillStyle = '#d4a848';
+      [lineY1, lineY2].forEach(ly => {
+        [-lineW/2, lineW/2].forEach(off => {
+          c.beginPath();
+          c.moveTo(W/2 + off, ly - 3); c.lineTo(W/2 + off + 3, ly);
+          c.lineTo(W/2 + off, ly + 3); c.lineTo(W/2 + off - 3, ly);
+          c.closePath(); c.fill();
+        });
+      });
+      // Subtitle
+      c.fillStyle = '#d4b890';
+      c.font = 'italic 14px Georgia,serif';
+      c.fillText('A daredevil\'s ledger', W/2, H * 0.42 + 50);
+      c.font = '600 11px Georgia,serif';
+      c.fillStyle = '#a08868';
+      c.fillText('1899', W/2, H * 0.42 + 70);
+
+      // Pulsing "Tap to begin"
+      const pulse = 0.5 + Math.sin(p * 2.5) * 0.4;
+      c.fillStyle = `rgba(212, 168, 72, ${pulse})`;
+      c.font = '600 13px Georgia,serif';
+      c.fillText('TAP TO BEGIN', W/2, H * 0.78);
+      c.fillStyle = `rgba(160, 136, 104, ${pulse * 0.6})`;
+      c.font = 'italic 10px Georgia,serif';
+      c.fillText('— ♪ in the upper right enables music —', W/2, H * 0.78 + 20);
+    }
+
+    // Subtle film-grain texture across the whole opening
+    if (Math.random() > 0.5){
+      c.fillStyle = `rgba(255, 220, 180, ${0.02 + Math.random() * 0.02})`;
+      for (let i = 0; i < 8; i++){
+        c.fillRect(Math.random() * W, Math.random() * H, 2, 2);
+      }
+    }
+
+    requestAnimationFrame(openingTick);
+  }
+
+  function drawOpeningBarrel(c){
+    // Painted-style oak barrel
+    c.fillStyle = '#a87a48';
+    c.beginPath();
+    c.moveTo(-14, -18); c.lineTo(14, -18);
+    c.quadraticCurveTo(18, 0, 14, 18); c.lineTo(-14, 18);
+    c.quadraticCurveTo(-18, 0, -14, -18); c.closePath(); c.fill();
+    c.strokeStyle = '#6a4828'; c.lineWidth = 0.8;
+    for (let i = -12; i <= 12; i += 6){ c.beginPath(); c.moveTo(i, -17); c.lineTo(i, 17); c.stroke(); }
+    c.fillStyle = '#3c2810';
+    c.fillRect(-16, -16, 32, 3); c.fillRect(-16, 0, 32, 3); c.fillRect(-16, 13, 32, 3);
+    // Subtle highlight to suggest paint
+    c.fillStyle = 'rgba(255, 220, 170, 0.18)';
+    c.fillRect(-12, -16, 3, 32);
+  }
+
+  // Listen for resize on the opening canvas too
+  window.addEventListener('resize', () => { if (openingCanvas && !openingState.finished) resizeOpeningCanvas(); });
+
+
+  // ===== GRAPHICS — Painted aesthetic =====
+  // Apply a warm sepia overlay across all scenes for consistency
+  function applySepiaWarm(){
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, 'rgba(255, 220, 170, 0.08)');
+    g.addColorStop(0.5, 'rgba(180, 120, 60, 0.04)');
+    g.addColorStop(1, 'rgba(80, 40, 20, 0.12)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+
+  // Add subtle vignette
+  function applyVignette(){
+    const g = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.4, W/2, H/2, Math.max(W,H)*0.7);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(40,20,10,0.35)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+
+  // Painterly brush stroke for clouds
+  function paintCloud(x, y, w, h, color, alpha){
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    for (let i = 0; i < 5; i++){
+      const ox = (i-2) * w * 0.18;
+      const oh = h * (0.7 + Math.random() * 0.5);
+      ctx.beginPath();
+      ctx.ellipse(x + ox, y + Math.sin(i)*2, w * 0.35, oh, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawSceneForFall(){
+    const f = currentFall();
+    switch(f.theme){
+      case 'forest': drawForestScene(); break;
+      case 'savanna': drawSavannaScene(); break;
+      case 'jungle': drawJungleScene(); break;
+      case 'tepui': drawTepuiScene(); break;
+      case 'cliff': drawCliffScene(); break;
+      case 'ice': drawIceScene(); break;
+      case 'deep': drawDeepScene(); break;
+      case 'miranda': drawMirandaScene(); break;
+      case 'mars': drawMarsScene(); break;
+      default: drawForestScene();
+    }
+    applySepiaWarm();
+    applyVignette();
+  }
+
+  // Niagara — autumnal, painterly Hudson-school sky
+  function drawForestScene(){
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#f0d8a0'); g.addColorStop(0.25,'#e0c890'); g.addColorStop(0.6,'#a4a878'); g.addColorStop(1,'#5a6a4a');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // Distant mountains
+    ctx.fillStyle = '#7a8068';
+    ctx.beginPath(); ctx.moveTo(0,80); ctx.lineTo(W*0.2,55); ctx.lineTo(W*0.4,75); ctx.lineTo(W*0.6,50); ctx.lineTo(W*0.85,72); ctx.lineTo(W,60); ctx.lineTo(W,90); ctx.lineTo(0,90); ctx.closePath(); ctx.fill();
+    // Painted clouds
+    paintCloud(W*0.2, 35, 70, 14, '#f4e4c0', 0.7);
+    paintCloud(W*0.7, 28, 90, 16, '#e8d4a8', 0.6);
+    // Forested ridge along cliff edge
+    ctx.fillStyle = '#3a4a2a';
+    for(let i=0; i<20; i++){
+      const tx = i * (W/20); const th = 18 + Math.sin(i*1.7) * 6;
+      ctx.beginPath();
+      ctx.moveTo(tx, 110);
+      ctx.quadraticCurveTo(tx+5, 110-th, tx+10, 110-th*0.6);
+      ctx.quadraticCurveTo(tx+15, 110-th*1.1, tx+20, 110);
+      ctx.fill();
+    }
+    // Cliff edge
+    ctx.fillStyle='#5a4028'; ctx.fillRect(0,108,W,12);
+    drawWaterfall(120, H-60, '#f4f0e0', '#7a9aaa');
+    drawMist(120, H-90);
+  }
+
+  // Victoria — savanna baobabs, dust haze
+  function drawSavannaScene(){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#f4d090'); g.addColorStop(0.3,'#e4a878'); g.addColorStop(0.6,'#b8804a'); g.addColorStop(1,'#5a3a20');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // Sun, hazy
+    ctx.fillStyle='rgba(244,180,90,0.7)';
+    ctx.beginPath(); ctx.arc(W-80,55,28,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(244,180,90,0.3)';
+    ctx.beginPath(); ctx.arc(W-80,55,42,0,Math.PI*2); ctx.fill();
+    // Distant flat acacia treeline
+    ctx.fillStyle='#6a4a28';
+    for(let i=0; i<8; i++){
+      const tx = i*(W/7) + 10;
+      ctx.fillRect(tx, 78, 2, 28);
+      // Flat-top crown
+      ctx.beginPath(); ctx.ellipse(tx+1, 75, 14, 4, 0, 0, Math.PI*2); ctx.fill();
+    }
+    // Dust haze
+    ctx.fillStyle='rgba(220,170,100,0.25)';
+    ctx.fillRect(0, 70, W, 30);
+    // Cliff edge
+    ctx.fillStyle='#7a5028'; ctx.fillRect(0,103,W,18);
+    drawWaterfall(120, H-55, '#f4e8c8', '#a08868');
+    drawMist(120, H-90, '#e8d4a8');
+  }
+
+  // Iguazu — dense jungle, parrots
+  function drawJungleScene(){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#c4d8a8'); g.addColorStop(0.4,'#7aa070'); g.addColorStop(1,'#3a5a3a');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // Layered canopy
+    ctx.fillStyle='#4a6a3a';
+    for(let i=0; i<20; i++){
+      const x=(i*23)%W; const y=50+(i*13)%55;
+      ctx.beginPath();
+      for(let j=0;j<8;j++){ const a=(j/8)*Math.PI*2; const r=12+Math.sin(j*1.7)*5; ctx.lineTo(x+Math.cos(a)*r,y+Math.sin(a)*r); }
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle='#3a5a2a';
+    for(let i=0; i<15; i++){
+      const x=(i*31)%W; const y=70+(i*17)%35;
+      ctx.beginPath();
+      for(let j=0;j<7;j++){ const a=(j/7)*Math.PI*2; const r=8+Math.sin(j*2)*3; ctx.lineTo(x+Math.cos(a)*r,y+Math.sin(a)*r); }
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle='#2a3a1a'; ctx.fillRect(0,108,W,14);
+    drawWaterfall(124, H-60, '#d8e8d4', '#5a8a70');
+  }
+
+  // Angel — tepui plateau silhouette, mist below
+  function drawTepuiScene(){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#d8e0e8'); g.addColorStop(0.3,'#b0b8c4'); g.addColorStop(0.7,'#7a8a98'); g.addColorStop(1,'#4a5a6a');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // Distant tepuis (tabletop mountains) silhouettes
+    ctx.fillStyle='rgba(80,90,100,0.7)';
+    const tepuis = [[0,80,90,30],[100,72,120,38],[230,78,90,32],[330,70,100,40]];
+    for(const [x,y,w,h] of tepuis){
+      ctx.fillRect(x, y, w, h);
+      // Top notch
+      ctx.fillRect(x+5, y-3, w-10, 3);
+    }
+    // Cloud sea below tepuis
+    paintCloud(W*0.3, 100, 110, 8, '#f0ecdc', 0.85);
+    paintCloud(W*0.7, 105, 100, 7, '#e8e0c8', 0.75);
+    paintCloud(W*0.5, 115, 130, 9, '#e0d4b8', 0.7);
+    // Cliff edge - narrow
+    ctx.fillStyle='#3a2a1a'; ctx.fillRect(0,118,W,8);
+    drawWaterfall(126, H-50, '#f4f4f0', '#8a9aa8');
+    drawMist(126, H-80, '#e0d4c0');
+    drawMist(126, H-30, '#e0d4c0');
+  }
+
+  // Tugela — basalt escarpment, rocks
+  function drawCliffScene(){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#e0c8a0'); g.addColorStop(0.4,'#a07858'); g.addColorStop(1,'#3a2818');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // Basalt rock formations
+    ctx.fillStyle='#5a4030';
+    for(let i=0; i<12; i++){
+      const x=i*(W/11); const h=40+Math.sin(i*1.3)*15;
+      ctx.beginPath();
+      ctx.moveTo(x, 110);
+      ctx.lineTo(x+10, 110-h*0.3);
+      ctx.lineTo(x+18, 110-h);
+      ctx.lineTo(x+28, 110-h*0.6);
+      ctx.lineTo(x+35, 110);
+      ctx.closePath(); ctx.fill();
+    }
+    // Strata lines
+    ctx.strokeStyle='rgba(60,40,20,0.4)'; ctx.lineWidth=1;
+    for(let y=78; y<108; y+=4){ ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y+Math.sin(y*0.1)*2); ctx.stroke(); }
+    ctx.fillStyle='#2a1a08'; ctx.fillRect(0,107,W,15);
+    drawWaterfall(123, H-60, '#f0d8b0', '#a08068');
+  }
+
+  // Frozen Niagara — ice cathedral
+  function drawIceScene(){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#e8eef6'); g.addColorStop(0.5,'#b0c4d8'); g.addColorStop(1,'#6a8098');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // Snow flecks
+    ctx.fillStyle='#ffffff';
+    for(let i=0; i<60; i++){ const x=(i*47)%W; const y=(i*23)%(H-100); ctx.fillRect(x,y,2,2); }
+    // Distant ice formations
+    ctx.fillStyle='rgba(140,170,196,0.6)';
+    for(let i=0; i<6; i++){
+      const x = i*(W/5);
+      ctx.beginPath();
+      ctx.moveTo(x, 80); ctx.lineTo(x+15, 50); ctx.lineTo(x+30, 80);
+      ctx.fill();
+    }
+    // Snow ground
+    ctx.fillStyle='#d8e4ec'; ctx.fillRect(0,90,W,20);
+    // Icicles hanging from cliff edge
+    ctx.fillStyle='#e8f0f6';
+    for(let i=0; i<15; i++){
+      const x = i*(W/14);
+      const ih = 14 + Math.sin(i*2.1)*8;
+      ctx.beginPath();
+      ctx.moveTo(x, 108); ctx.lineTo(x+3, 108+ih); ctx.lineTo(x+6, 108);
+      ctx.fill();
+    }
+    drawWaterfall(124, H-55, '#f4f8fc', '#a0b8cc', true);
+  }
+
+  // Denmark Strait — dark, deep, bioluminescent flecks
+  function drawDeepScene(){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#2a4a6a'); g.addColorStop(0.4,'#0a2a4a'); g.addColorStop(1,'#000508');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    const t = performance.now()*0.001;
+    // Bioluminescent particles
+    ctx.fillStyle='rgba(180,220,255,0.5)';
+    for(let i=0; i<20; i++){
+      const x = (i*37 + Math.sin(t+i)*40) % W;
+      const y = (i*41 + t*30) % H;
+      const size = 1 + Math.sin(t*2+i)*0.5;
+      ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI*2); ctx.fill();
+    }
+    // Cliff/ridge silhouette
+    ctx.fillStyle='#000308';
+    ctx.beginPath();
+    ctx.moveTo(0, 90); ctx.lineTo(W, 90); ctx.lineTo(W, 65);
+    ctx.lineTo(W*0.7, 75); ctx.lineTo(W*0.45, 60); ctx.lineTo(W*0.2, 70); ctx.lineTo(0, 78);
+    ctx.closePath(); ctx.fill();
+    // Light rays from above
+    ctx.fillStyle='rgba(160,200,240,0.08)';
+    for(let i=0; i<3; i++){
+      const x = W*0.3 + i*W*0.2;
+      ctx.beginPath();
+      ctx.moveTo(x-20, 0); ctx.lineTo(x+20, 0); ctx.lineTo(x+5, H*0.5); ctx.lineTo(x-5, H*0.5);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+
+  // Verona Rupes — Miranda surface, Uranus visible
+  function drawMirandaScene(){
+    ctx.fillStyle='#0a0a18'; ctx.fillRect(0,0,W,H);
+    // Stars
+    ctx.fillStyle='#ffffff';
+    for(let i=0; i<100; i++){
+      const x=(i*53)%W; const y=(i*29)%H;
+      const s=(i%7===0)?2:(i%3===0?1:0.5);
+      ctx.fillRect(x,y,s,s);
+    }
+    // Uranus
+    const ux=W-80, uy=55;
+    const ug=ctx.createRadialGradient(ux-8,uy-8,5,ux,uy,42);
+    ug.addColorStop(0,'#c0f0e4'); ug.addColorStop(0.5,'#7ab8aa'); ug.addColorStop(1,'#1a4858');
+    ctx.fillStyle=ug; ctx.beginPath(); ctx.arc(ux,uy,34,0,Math.PI*2); ctx.fill();
+    // Ring
+    ctx.strokeStyle='rgba(220,240,234,0.45)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.ellipse(ux,uy,48,9,0.3,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle='rgba(200,220,214,0.25)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.ellipse(ux,uy,52,10,0.3,0,Math.PI*2); ctx.stroke();
+    // Miranda surface — chevron-shaped formations (real feature)
+    ctx.fillStyle='#3a2a3a';
+    ctx.fillRect(0,98,W,15);
+    // Chevron pattern
+    ctx.fillStyle='#1a0a1a';
+    for(let i=0; i<W/12; i++){
+      const x = i*12;
+      ctx.beginPath();
+      ctx.moveTo(x, 113); ctx.lineTo(x+6, 100); ctx.lineTo(x+12, 113);
+      ctx.fill();
+    }
+  }
+
+  // Olympus Mons — Mars, thermal plumes, dust
+  function drawMarsScene(){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#7a3a1a'); g.addColorStop(0.3,'#a85a2a'); g.addColorStop(0.6,'#c47040'); g.addColorStop(1,'#4a1a08');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // Distant volcano peaks
+    ctx.fillStyle='#3a1808';
+    for(let i=0; i<5; i++){
+      const x=i*(W/4)-20;
+      ctx.beginPath();
+      ctx.moveTo(x, 90);
+      ctx.lineTo(x+30, 50);
+      ctx.lineTo(x+40, 60);
+      ctx.lineTo(x+60, 90);
+      ctx.closePath(); ctx.fill();
+    }
+    // Caldera rim (we are launching from the top)
+    ctx.fillStyle='#2a0a00'; ctx.fillRect(0,90,W,22);
+    // Caldera glow at edge
+    ctx.fillStyle='rgba(255,120,40,0.3)'; ctx.fillRect(0,108,W,4);
+    // Dust haze
+    const t = performance.now()*0.0008;
+    ctx.fillStyle='rgba(220,140,80,0.15)';
+    for(let i=0; i<6; i++){
+      const x = ((i*70 + t*40) % (W+100)) - 50;
+      ctx.beginPath();
+      ctx.ellipse(x, H*0.4 + Math.sin(t+i)*10, 60, 20, 0, 0, Math.PI*2); ctx.fill();
+    }
+    // Thermal plumes shimmering
+    ctx.fillStyle='rgba(255,80,20,0.35)';
+    for(let i=0; i<5; i++){
+      const x = 50+i*(W/5)+Math.sin(t*3+i)*20;
+      const py = H*0.5 + Math.sin(t*2+i)*20;
+      ctx.beginPath();
+      ctx.ellipse(x, py, 14, 26, 0, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  function drawWaterfall(topY, bottomY, lightCol, darkCol, faded){
+    const cliffX = Math.max(40, W*0.18);
+    const cliffW = W - cliffX*2;
+    const t = performance.now()*0.003;
+    // Cascade body
+    ctx.fillStyle = darkCol; ctx.fillRect(cliffX, topY, cliffW, bottomY-topY);
+    if (!faded){
+      for (let y = topY; y < bottomY; y += 4){
+        const alpha = 0.35 + Math.sin((y+t*200)*0.08) * 0.18;
+        ctx.fillStyle = `rgba(255,250,235,${alpha})`;
+        const stripeX = cliffX + Math.sin((y+t*100)*0.05) * 5;
+        ctx.fillRect(stripeX, y, cliffW, 2);
+      }
+    }
+    // Spray at base
+    ctx.fillStyle = lightCol;
+    for (let i = 0; i < 18; i++){
+      const fx = cliffX + (i/17)*cliffW;
+      const fy = bottomY - 8 + Math.sin(i+t*3) * 5;
+      ctx.beginPath();
+      ctx.arc(fx, fy, 5+Math.random()*4, 0, Math.PI*2); ctx.fill();
+    }
+    // Pool below
+    ctx.fillStyle = darkCol; ctx.fillRect(0, bottomY, W, H-bottomY);
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    for (let y = bottomY+5; y < H; y += 6){
+      const jitter = Math.sin((y+t*150)*0.12) * 6;
+      ctx.fillRect(jitter, y, W, 2);
+    }
+  }
+
+  function drawMist(x, y, col){
+    col = col || '#ffffff';
+    const t = performance.now()*0.001;
+    ctx.fillStyle = col;
+    for (let i = 0; i < 10; i++){
+      const mx = 60 + i*36 + Math.sin(t+i)*12;
+      const my = y + Math.sin(t*2+i*0.5)*10;
+      ctx.globalAlpha = 0.22 + Math.sin(t+i)*0.12;
+      ctx.beginPath();
+      ctx.ellipse(mx, my, 26, 9, 0, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ===== VESSELS =====
+  function drawVesselOnContext(c, vessel, rot, scale){
+    c.save(); c.rotate(rot); c.scale(scale, scale);
+    if (vessel === 'oakbarrel'){
+      c.fillStyle='#a87a48';
+      c.beginPath(); c.moveTo(-14,-18); c.lineTo(14,-18); c.quadraticCurveTo(18,0,14,18); c.lineTo(-14,18); c.quadraticCurveTo(-18,0,-14,-18); c.closePath(); c.fill();
+      c.strokeStyle='#6a4828'; c.lineWidth=0.8;
+      for (let i=-12; i<=12; i+=6){ c.beginPath(); c.moveTo(i,-17); c.lineTo(i,17); c.stroke(); }
+      c.fillStyle='#3c2810';
+      c.fillRect(-16,-16,32,3); c.fillRect(-16,0,32,3); c.fillRect(-16,13,32,3);
+      // heart pillow
+      c.fillStyle='#c04a60'; c.globalAlpha=0.7;
+      c.beginPath(); c.arc(-4,-3,2,0,Math.PI*2); c.fill();
+      c.beginPath(); c.arc(0,-3,2,0,Math.PI*2); c.fill();
+      c.beginPath(); c.moveTo(-6,-2); c.lineTo(2,-2); c.lineTo(-2,2); c.closePath(); c.fill();
+      c.globalAlpha=1;
+    } else if (vessel === 'steeldrum'){
+      const g=c.createLinearGradient(-16,0,16,0);
+      g.addColorStop(0,'#4a5560'); g.addColorStop(0.5,'#8a98a8'); g.addColorStop(1,'#4a5560');
+      c.fillStyle=g; c.fillRect(-16,-20,32,40);
+      c.fillStyle='#2a333f'; c.fillRect(-17,-20,34,2); c.fillRect(-17,18,34,2);
+      c.fillStyle='#1a2028';
+      [-14,14].forEach(rx => { [-16,-8,0,8,16].forEach(ry => { c.beginPath(); c.arc(rx,ry,1.2,0,Math.PI*2); c.fill(); }); });
+      c.fillStyle='#e4d9b8'; c.font='500 4px serif'; c.textAlign='center'; c.fillText('LEACH',0,-2);
+    } else if (vessel === 'rubberball'){
+      const g=c.createRadialGradient(-6,-6,2,0,0,22);
+      g.addColorStop(0,'#6a5a3a'); g.addColorStop(1,'#2a1a0a');
+      c.fillStyle=g; c.beginPath(); c.arc(0,0,20,0,Math.PI*2); c.fill();
+      c.strokeStyle='#4a3a2a'; c.lineWidth=1; c.beginPath(); c.arc(0,0,20,0,Math.PI*2); c.stroke();
+      // inner tube valve marks
+      c.fillStyle='#1a0a00';
+      for (let i=0; i<12; i++){
+        const a=(i/12)*Math.PI*2; const rx=Math.cos(a)*17; const ry=Math.sin(a)*17;
+        c.beginPath(); c.arc(rx, ry, 1, 0, Math.PI*2); c.fill();
+      }
+    } else if (vessel === 'redbarrel'){
+      const g=c.createLinearGradient(-14,0,14,0);
+      g.addColorStop(0,'#8a1a1a'); g.addColorStop(0.5,'#d43a2a'); g.addColorStop(1,'#8a1a1a');
+      c.fillStyle=g;
+      c.beginPath(); c.moveTo(-14,-20); c.lineTo(14,-20); c.quadraticCurveTo(17,0,14,20); c.lineTo(-14,20); c.quadraticCurveTo(-17,0,-14,-20); c.closePath(); c.fill();
+      c.fillStyle='#4a0a0a'; c.fillRect(-16,-18,32,2); c.fillRect(-16,17,32,2);
+      c.fillStyle='#ffffff'; c.font='bold 5px sans-serif'; c.textAlign='center';
+      c.fillText('SOUCEK',0,-4); c.fillText('1984',0,4);
+    } else if (vessel === 'rocket'){
+      // engine glow
+      c.fillStyle='#ff6a1a';
+      for (let i=0; i<5; i++){
+        c.globalAlpha = 0.7 - i*0.12;
+        c.beginPath(); c.ellipse(0, 22+i*5, 7-i, 14+i*3, 0, 0, Math.PI*2); c.fill();
+      }
+      c.globalAlpha = 1;
+      // body
+      const g=c.createLinearGradient(-14,0,14,0);
+      g.addColorStop(0,'#4a5a6a'); g.addColorStop(0.5,'#a8b8c8'); g.addColorStop(1,'#4a5a6a');
+      c.fillStyle=g;
+      c.beginPath(); c.moveTo(-12,-24); c.lineTo(12,-24); c.quadraticCurveTo(16,0,12,22); c.lineTo(-12,22); c.quadraticCurveTo(-16,0,-12,-24); c.closePath(); c.fill();
+      // nose cone
+      c.fillStyle='#6a7a8a';
+      c.beginPath(); c.moveTo(-12,-24); c.lineTo(0,-32); c.lineTo(12,-24); c.closePath(); c.fill();
+      // brass bands
+      c.fillStyle='#d4a848';
+      c.fillRect(-14,-18,28,2); c.fillRect(-14,-4,28,2); c.fillRect(-14,14,28,2);
+      // porthole
+      c.fillStyle='#2a3a4a'; c.beginPath(); c.arc(0,-8,4,0,Math.PI*2); c.fill();
+      c.fillStyle='#a0d0f0'; c.beginPath(); c.arc(0,-8,3,0,Math.PI*2); c.fill();
+      // fins
+      c.fillStyle='#2a3a4a';
+      c.beginPath(); c.moveTo(-12,14); c.lineTo(-20,24); c.lineTo(-12,20); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(12,14); c.lineTo(20,24); c.lineTo(12,20); c.closePath(); c.fill();
+    }
+    c.restore();
+  }
+
+  function drawVessel(x, y, rot, scale){
+    scale = scale || 1;
+    const skin = state.equipped.vessel_skin;
+    const override = ['oak_reinforced','copper_clad','brass_riveted','ironclad','porcelain','society_gilt'].includes(skin);
+    ctx.save(); ctx.translate(x, y);
+    if (override){ drawCustomSkin(skin, rot, scale); }
+    else { drawVesselOnContext(ctx, currentPersona().vessel, rot, scale); }
+    if (state.equipped.pennant){
+      ctx.save(); ctx.rotate(rot); ctx.scale(scale, scale);
+      const pcol = state.equipped.pennant === 'pennant_royal' ? '#ac2a6a' : '#3a5a8a';
+      ctx.fillStyle = pcol;
+      ctx.beginPath(); ctx.moveTo(0,-20); ctx.lineTo(10,-24); ctx.lineTo(10,-18); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='#2a1a1a'; ctx.lineWidth=0.5;
+      ctx.beginPath(); ctx.moveTo(0,-20); ctx.lineTo(0,-28); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function drawCustomSkin(skin, rot, scale){
+    const colors = {
+      oak_reinforced: {body:'#7a5030', dark:'#4a2810', band:'#2a1808'},
+      brass_riveted: {body:'#d4b060', dark:'#9a7830', band:'#6a4a20'},
+      porcelain: {body:'#f0ecd8', dark:'#a0958a', band:'#4a403a'}
+    };
+    const col = colors[skin] || colors.oak_reinforced;
+    ctx.save(); ctx.rotate(rot); ctx.scale(scale, scale);
+    ctx.fillStyle = col.body;
+    ctx.beginPath(); ctx.moveTo(-14,-18); ctx.lineTo(14,-18); ctx.quadraticCurveTo(18,0,14,18); ctx.lineTo(-14,18); ctx.quadraticCurveTo(-18,0,-14,-18); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = col.dark; ctx.lineWidth = 0.8;
+    for (let i=-12; i<=12; i+=6){ ctx.beginPath(); ctx.moveTo(i,-17); ctx.lineTo(i,17); ctx.stroke(); }
+    ctx.fillStyle = col.band;
+    ctx.fillRect(-16,-16,32,3); ctx.fillRect(-16,0,32,3); ctx.fillRect(-16,13,32,3);
+    ctx.restore();
+  }
+
+  // ===== UI OVERLAYS DURING RUN =====
+  function drawAimMeter(){
+    const x=30, y=H-90, w=W-60, h=18;
+    // Frame
+    ctx.fillStyle = 'rgba(26,14,8,0.85)';
+    ctx.fillRect(x-3, y-3, w+6, h+6);
+    // Track
+    ctx.fillStyle = '#e8d8a8';
+    ctx.fillRect(x, y, w, h);
+    // Target zone
+    const pulse = 0.6 + Math.sin(performance.now()*0.005) * 0.25;
+    ctx.fillStyle = `rgba(42,138,74,${pulse})`;
+    ctx.fillRect(x + w*0.65, y, w*0.2, h);
+    // Power fill
+    const power = state.aimPower;
+    const inZone = power > 0.65 && power < 0.85;
+    ctx.fillStyle = inZone ? '#2a8a4a' : '#8a3a2a';
+    ctx.fillRect(x, y, w * power, h);
+    // Label
+    ctx.fillStyle = '#f4ecd8';
+    ctx.font = '600 11px Georgia,serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('HOLD TO CHARGE — RELEASE IN THE GREEN', W/2, y - 8);
+  }
+
+  function drawFallUI(){
+    const f = currentFall();
+    // Score panel
+    ctx.fillStyle = 'rgba(26,14,8,0.85)';
+    ctx.fillRect(8, 8, 145, 70);
+    ctx.strokeStyle = '#d4a848'; ctx.lineWidth = 0.5;
+    ctx.strokeRect(8, 8, 145, 70);
+    ctx.fillStyle = '#f4ecd8';
+    ctx.font = '600 11px Georgia,serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('STUNTS: ' + state.stuntScore, 16, 26);
+    const mulScale = 1 + (state.comboTimer > 0.9 ? (state.comboTimer - 0.9) * 5 : 0);
+    ctx.save(); ctx.translate(16, 46); ctx.scale(mulScale, mulScale);
+    ctx.fillText('COMBO: ×' + (1 + state.comboCount * 0.25).toFixed(2), 0, 0);
+    ctx.restore();
+    ctx.fillText('HYPE: ' + Math.round(state.crowdHype * 100) + '%', 16, 66);
+    // Hype meter
+    const hypeX = W - 32, hypeY = 12, hypeH = 96;
+    ctx.fillStyle = 'rgba(26,14,8,0.85)';
+    ctx.fillRect(hypeX - 3, hypeY - 3, 20, hypeH + 6);
+    ctx.strokeStyle = '#d4a848';
+    ctx.strokeRect(hypeX - 3, hypeY - 3, 20, hypeH + 6);
+    ctx.fillStyle = '#e8d8a8';
+    ctx.fillRect(hypeX, hypeY, 14, hypeH);
+    const hypePulse = state.crowdHype > 0.8 ? (0.8 + Math.sin(performance.now()*0.01)*0.2) : 1;
+    ctx.fillStyle = `rgba(218,148,42,${hypePulse})`;
+    const fill = hypeH * state.crowdHype;
+    ctx.fillRect(hypeX, hypeY + hypeH - fill, 14, fill);
+    // Ledge indicators
+    if (f.mechanic === 'ledges'){
+      state.mechState.ledges.forEach(l => {
+        if (!l.hit){
+          const ly = 80 + l.y * (H - 140);
+          ctx.strokeStyle = 'rgba(42,138,74,0.85)'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(W/2 - 50, ly); ctx.lineTo(W/2 + 50, ly); ctx.stroke();
+          ctx.fillStyle = 'rgba(42,138,74,0.3)';
+          ctx.fillRect(W/2 - 50, ly - 3, 100, 6);
+        }
+      });
+    }
+    // Breath meter (underwater)
+    if (f.mechanic === 'underwater'){
+      const bx = 10, by = 88, bw = 100, bh = 10;
+      ctx.fillStyle = 'rgba(26,14,8,0.85)';
+      ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
+      ctx.strokeStyle = '#6ad0e0';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(bx - 2, by - 2, bw + 4, bh + 4);
+      ctx.fillStyle = '#1a3a5a';
+      ctx.fillRect(bx, by, bw, bh);
+      const breathColor = state.breathMeter > 0.3 ? '#6ad0e0' : state.breathMeter > 0 ? '#d0a0a0' : '#8a2020';
+      const pulse = state.breathMeter < 0.3 ? (0.6 + Math.sin(performance.now()*0.012)*0.3) : 1;
+      ctx.fillStyle = breathColor;
+      ctx.globalAlpha = pulse;
+      ctx.fillRect(bx, by, bw * state.breathMeter, bh);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#f4ecd8';
+      ctx.font = '500 9px Georgia,serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('BREATH', bx, by - 4);
+    }
+    // Heat meter (volcano)
+    if (f.mechanic === 'volcano'){
+      const hx = 10, hy2 = 88, hw = 100, hh = 10;
+      ctx.fillStyle = 'rgba(26,14,8,0.85)';
+      ctx.fillRect(hx - 2, hy2 - 2, hw + 4, hh + 4);
+      ctx.strokeStyle = '#ea6a2a';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(hx - 2, hy2 - 2, hw + 4, hh + 4);
+      ctx.fillStyle = '#2a1a08';
+      ctx.fillRect(hx, hy2, hw, hh);
+      const heatColor = state.heatMeter < 0.6 ? '#ea6a2a' : state.heatMeter < 0.9 ? '#f08030' : '#ff2a0a';
+      const pulse = state.heatMeter > 0.85 ? (0.7 + Math.sin(performance.now()*0.014)*0.3) : 1;
+      ctx.fillStyle = heatColor;
+      ctx.globalAlpha = pulse;
+      ctx.fillRect(hx, hy2, hw * state.heatMeter, hh);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#f4ecd8';
+      ctx.font = '500 9px Georgia,serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('HEAT', hx, hy2 - 4);
+    }
+    // Air pockets (visible bubbles on underwater runs)
+    if (f.mechanic === 'underwater' && state.mechState.airPockets){
+      const t = performance.now() * 0.002;
+      for (const a of state.mechState.airPockets){
+        if (a.collected) continue;
+        const ay = 80 + a.progress * (H - 140);
+        if (ay < 60 || ay > H - 40) continue;
+        if (Math.abs(ay - state.barrelY) > 300) continue;
+        const bob = Math.sin(t + a.bob) * 4;
+        ctx.save();
+        ctx.translate(a.x, ay + bob);
+        // Outer glow
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 20);
+        g.addColorStop(0, 'rgba(180, 230, 255, 0.4)');
+        g.addColorStop(1, 'rgba(180, 230, 255, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(-20, -20, 40, 40);
+        // Bubble
+        ctx.strokeStyle = '#c0f0ff';
+        ctx.lineWidth = 1.5;
+        ctx.fillStyle = 'rgba(180, 220, 255, 0.3)';
+        ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+        // Highlight
+        ctx.fillStyle = 'rgba(240, 250, 255, 0.7)';
+        ctx.beginPath(); ctx.arc(-3, -3, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+
+  function drawHazards(){
+    const f = currentFall();
+    if (f.mechanic !== 'rocks' && f.mechanic !== 'ice') return;
+    for (const h of state.hazards){
+      if (h.hit) continue;
+      const hy = 80 + h.progress * (H - 140);
+      if (hy < 90 || hy > H - 60) continue;
+      if (f.mechanic === 'ice'){
+        ctx.fillStyle = '#e0f0f8'; ctx.strokeStyle = '#6a8a9a'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i=0; i<6; i++){ const a=(i/6)*Math.PI*2; const r=h.size/2 + (i%2?2:-2); ctx.lineTo(h.x + Math.cos(a)*r, hy + Math.sin(a)*r); }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      } else {
+        ctx.fillStyle = '#6a5040'; ctx.strokeStyle = '#3a2010'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i=0; i<7; i++){ const a=(i/7)*Math.PI*2; const r=h.size/2 + Math.sin(i*3)*3; ctx.lineTo(h.x + Math.cos(a)*r, hy + Math.sin(a)*r); }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+    }
+  }
+
+  function drawBonuses(){
+    const t = performance.now() * 0.002;
+    for (const b of state.bonuses){
+      if (b.collected) continue;
+      const by = 80 + b.progress * (H - 140);
+      // Only draw if in view and reasonably close to current descent
+      if (by < 60 || by > H - 40) continue;
+      if (Math.abs(by - state.barrelY) > 250) continue; // cull distant
+      const bob = Math.sin(t + b.bob) * 3;
+      if (b.type === 'cash'){
+        // Gold coin with dollar sign
+        ctx.save();
+        ctx.translate(b.x, by + bob);
+        // Glow
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 18);
+        g.addColorStop(0, 'rgba(244, 200, 72, 0.5)');
+        g.addColorStop(1, 'rgba(244, 200, 72, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(-18, -18, 36, 36);
+        // Coin
+        ctx.fillStyle = '#e8b840';
+        ctx.strokeStyle = '#8a6020';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+        // Inner shine
+        ctx.fillStyle = '#f4d888';
+        ctx.beginPath();
+        ctx.arc(-2, -2, 6, 0, Math.PI * 2);
+        ctx.fill();
+        // Dollar sign
+        ctx.fillStyle = '#6a4820';
+        ctx.font = 'bold 10px Georgia,serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('$', 0, 1);
+        ctx.restore();
+      } else {
+        // Prestige star — five-pointed
+        ctx.save();
+        ctx.translate(b.x, by + bob);
+        ctx.rotate(t * 0.8);
+        // Glow
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 22);
+        g.addColorStop(0, 'rgba(170, 90, 220, 0.5)');
+        g.addColorStop(1, 'rgba(170, 90, 220, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(-22, -22, 44, 44);
+        // Star
+        ctx.fillStyle = '#c890f0';
+        ctx.strokeStyle = '#4a2060';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++){
+          const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+          const r = i % 2 === 0 ? 11 : 5;
+          ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        // Inner gem
+        ctx.fillStyle = '#f0d8ff';
+        ctx.beginPath();
+        ctx.arc(0, 0, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+
+  function drawSteeringHints(){
+    // Only show in touch mode (tilt mode has hands-off lateral)
+    if (state.inputMode === 'tilt' && state.tiltPermissionGranted) return;
+    if (state.phase !== 'falling') return;
+    // Left edge indicator
+    const leftActive = state.touchLateralDir < 0;
+    const rightActive = state.touchLateralDir > 0;
+    const leftAlpha = leftActive ? 0.45 : 0.12;
+    const rightAlpha = rightActive ? 0.45 : 0.12;
+    // Left band
+    const lg = ctx.createLinearGradient(0, 0, W*0.25, 0);
+    lg.addColorStop(0, `rgba(244,200,72,${leftAlpha})`);
+    lg.addColorStop(1, `rgba(244,200,72,0)`);
+    ctx.fillStyle = lg; ctx.fillRect(0, 0, W*0.25, H);
+    // Right band
+    const rg = ctx.createLinearGradient(W, 0, W*0.75, 0);
+    rg.addColorStop(0, `rgba(244,200,72,${rightAlpha})`);
+    rg.addColorStop(1, `rgba(244,200,72,0)`);
+    ctx.fillStyle = rg; ctx.fillRect(W*0.75, 0, W*0.25, H);
+    // Arrows
+    ctx.fillStyle = `rgba(244,200,72,${leftActive ? 0.9 : 0.3})`;
+    ctx.font = '700 24px Georgia,serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('◄', W*0.08, H/2);
+    ctx.fillStyle = `rgba(244,200,72,${rightActive ? 0.9 : 0.3})`;
+    ctx.fillText('►', W*0.92, H/2);
+  }
+
+  function drawFlash(){
+    if (state.flashT <= 0) return;
+    const alpha = state.flashT;
+    state.flashScale = Math.min(1.3, state.flashScale + 0.08);
+    ctx.save(); ctx.translate(W/2, H/2 - 40); ctx.scale(state.flashScale, state.flashScale);
+    ctx.fillStyle = `rgba(26,14,8,${alpha*0.78})`;
+    ctx.fillRect(-135, -19, 270, 38);
+    ctx.strokeStyle = `rgba(212,168,72,${alpha})`;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-135, -19, 270, 38);
+    ctx.fillStyle = state.flashColor;
+    ctx.globalAlpha = alpha;
+    ctx.font = '700 16px Georgia,serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(state.flashText, 0, 0);
+    ctx.restore();
+    state.flashT -= 0.025;
+  }
+
+  function drawParticles(){
+    for (let i = state.particles.length - 1; i >= 0; i--){
+      const p = state.particles[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= 0.025;
+      if (p.life <= 0){ state.particles.splice(i, 1); continue; }
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ===== MAIN LOOP =====
+  function tick(){
+    let offX = 0, offY = 0;
+    if (state.shakeT > 0){
+      offX = (Math.random() - 0.5) * state.shakeMag;
+      offY = (Math.random() - 0.5) * state.shakeMag;
+      state.shakeT -= 1/60; state.shakeMag *= 0.92;
+    }
+    shakeWrap.style.transform = `translate(${offX}px, ${offY}px)`;
+    if (state.screen === 'play' && (state.phase === 'aiming' || state.phase === 'falling' || state.phase === 'splashing')){
+      drawSceneForFall();
+      drawHazards();
+      drawBonuses();
+      if (state.phase === 'aiming'){
+        if (state.holdStart > 0){
+          const dt = (performance.now() - state.holdStart) / 1500;
+          state.aimPower = Math.min(1, dt);
+        }
+        drawVessel(W/2, 75, 0);
+        drawAimMeter();
+      } else if (state.phase === 'falling'){
+        state.fallProgress += state.fallSpeed;
+        state.barrelY = 80 + state.fallProgress * (H - 140);
+        state.barrelRot += state.barrelVRot;
+        state.barrelVRot *= 0.94;
+        const f = currentFall();
+        if (f.mechanic !== 'zerog') state.barrelVRot = Math.max(0.03, state.barrelVRot);
+        else state.barrelVRot *= 0.98;
+        if (state.comboTimer > 0){
+          state.comboTimer -= 1/60;
+          if (state.comboTimer <= 0) state.comboCount = 0;
+        }
+        tickAbilityCooldown(1/60);
+        updateAbilityButton();
+        updateMechanic();
+        drawVessel(state.barrelX, state.barrelY, state.barrelRot);
+        drawFallUI();
+        drawSteeringHints();
+        if (state.fallProgress >= 1) endRun();
+      } else if (state.phase === 'splashing'){
+        // Hide ability button during splash
+        if (abilityBtn) abilityBtn.classList.remove('visible');
+        state.splashT += 1/60;
+        drawVessel(state.barrelX, H - 40, state.barrelRot, Math.max(0, 1 - state.splashT));
+        if (state.splashT > 1.2){
+          state.phase = 'results';
+          switchScreen('play');
+          showResults();
+        }
+      }
+      drawParticles();
+      drawFlash();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ===== INPUT =====
+  // ===== INPUT =====
+  // Tracks all active pointers to know their screen X positions
+  const activePointerMap = new Map(); // pointerId -> {x, startTime, flipFired, role}
+
+  function getPointerRole(x){
+    // If tilt is enabled, the whole canvas is for stunts
+    if (state.inputMode === 'tilt' && state.tiltPermissionGranted) return 'stunt';
+    // Touch mode: edges steer, middle is for stunts
+    if (x < W * 0.25) return 'steerLeft';
+    if (x > W * 0.75) return 'steerRight';
+    return 'stunt';
+  }
+
+  function recomputeLateralDir(){
+    let leftHeld = false, rightHeld = false;
+    for (const p of activePointerMap.values()){
+      if (p.role === 'steerLeft') leftHeld = true;
+      if (p.role === 'steerRight') rightHeld = true;
+    }
+    state.touchLateralDir = (rightHeld ? 1 : 0) + (leftHeld ? -1 : 0);
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const role = getPointerRole(x);
+    activePointerMap.set(e.pointerId, {
+      x, startTime: performance.now(), flipFired: false, role
+    });
+    state.activePointers = activePointerMap.size;
+
+    if (state.phase === 'aiming'){
+      if (state.holdStart === 0) state.holdStart = performance.now();
+      return;
+    }
+    if (state.phase === 'falling'){
+      if (role === 'steerLeft' || role === 'steerRight'){
+        recomputeLateralDir();
+        return;
+      }
+      // Stunt role
+      // Count stunt-role pointers to detect two-finger corkscrew
+      let stuntCount = 0;
+      for (const p of activePointerMap.values()) if (p.role === 'stunt') stuntCount++;
+      if (stuntCount >= 2 || e.shiftKey){
+        if (!state.corkscrewFired){ triggerStunt('corkscrew'); state.corkscrewFired = true; }
+        return;
+      }
+      triggerStunt('spin');
+    }
+  });
+
+  canvas.addEventListener('pointerup', (e) => {
+    const p = activePointerMap.get(e.pointerId);
+    activePointerMap.delete(e.pointerId);
+    state.activePointers = activePointerMap.size;
+    recomputeLateralDir();
+
+    if (state.phase === 'aiming' && state.holdStart > 0){ beginFall(); return; }
+    if (state.phase === 'falling' && p && p.role === 'stunt'){
+      const held = (performance.now() - p.startTime) / 1000;
+      if (held > 0.35 && !p.flipFired){ triggerStunt('flip'); }
+      // Reset corkscrew armed state only when no stunt pointers remain
+      let anyStunt = false;
+      for (const pp of activePointerMap.values()) if (pp.role === 'stunt'){ anyStunt = true; break; }
+      if (!anyStunt) state.corkscrewFired = false;
+    }
+  });
+
+  canvas.addEventListener('pointercancel', (e) => {
+    activePointerMap.delete(e.pointerId);
+    state.activePointers = activePointerMap.size;
+    recomputeLateralDir();
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    // Re-assess role if a pointer drags across a boundary
+    const p = activePointerMap.get(e.pointerId);
+    if (!p) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    p.x = x;
+    const newRole = getPointerRole(x);
+    if (newRole !== p.role){
+      p.role = newRole;
+      recomputeLateralDir();
+    }
+  });
+
+  // Prevent iOS double-tap zoom
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, false);
+  document.addEventListener('gesturestart', e => e.preventDefault());
+
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 100));
+  updateHud();
+  tick();
+  startOpening();
+})();
+</script>
+</body>
+</html>
